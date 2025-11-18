@@ -1540,7 +1540,7 @@ function printIndividualResult(event) {
                             `<img src="${currentSignatures.principal}" alt="School Principal Signature" class="signature-image">` : 
                             '<div class="signature-placeholder"></div>'
                         }
-                        <div class="signature-name">School Principal</div>
+                        <div class="signature-name">VP ACADEMICS SNR(DD)</div>
                     </div>
                 </div>
             </div>
@@ -2595,3 +2595,4 @@ document.getElementById('remove-principal-signature')?.addEventListener('click',
 });
 
 console.log('CBT System JavaScript loaded successfully!');
+
