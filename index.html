@@ -55,8 +55,8 @@
                 <div class="emergency-contact">
                     <h6>Need Help?</h6>
                     <p class="mb-1"><small>If you encounter any issues during the exam, please contact:</small></p>
-                    <p class="mb-1"><small><strong>Exam Coordinator:</strong> 0800-123-4567</small></p>
-                    <p class="mb-0"><small><strong>Technical Support:</strong> 0800-765-4321</small></p>
+                    <p class="mb-1"><small><strong>TECH TUTOR 1:</strong> 0901-342-1812</small></p>
+                    <p class="mb-0"><small><strong>TECH TUTOR 2:</strong> 0903-182-2536</small></p>
                 </div>
                 
                 <div class="mt-5 pt-4 border-top text-center">
@@ -192,13 +192,13 @@
                             <div id="cert-coordinator-signature">
                                 <div class="signature-placeholder"></div>
                             </div>
-                            <small>EXAM COORDINATOR</small>
+                            <small>TECH TUTOR</small>
                         </div>
                         <div class="signature-line">
                             <div id="cert-principal-signature">
                                 <div class="signature-placeholder"></div>
                             </div>
-                            <small>SCHOOL PRINCIPAL</small>
+                            <small>VP ACADMICS SNR (DD)</small>
                         </div>
                     </div>
                 </div>
@@ -241,6 +241,7 @@
                     <div class="tab-buttons">
                         <button class="tab-button active" data-tab="results-panel">View Results</button>
                         <button class="tab-button" data-tab="students-panel">Manage Students</button>
+                        <button class="tab-button" data-tab="questions-panel">Manage Questions</button>
                         <button class="tab-button" data-tab="signatures-panel">Manage Signatures</button>
                         <button class="tab-button" data-tab="realtime-panel">Real-Time Controls</button>
                     </div>
@@ -329,6 +330,35 @@
                                                 </button>
                                             </div>
                                             <small class="text-muted">Restore from backup JSON file</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Data Management Section -->
+                            <div class="card mt-4">
+                                <div class="card-header">
+                                    <h6>Data Management</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <button id="clear-all-students" class="btn btn-danger w-100 mb-2">
+                                                🗑️ Clear All Students
+                                            </button>
+                                            <small class="text-muted">Delete all student records</small>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <button id="clear-all-results" class="btn btn-danger w-100 mb-2">
+                                                🗑️ Clear All Results
+                                            </button>
+                                            <small class="text-muted">Delete all exam results</small>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <button id="view-auto-registered" class="btn btn-info w-100 mb-2">
+                                                👥 Auto-Registered Students
+                                            </button>
+                                            <small class="text-muted">View students who auto-registered</small>
                                         </div>
                                     </div>
                                 </div>
@@ -434,6 +464,177 @@
                             
                             <div class="mt-3">
                                 <button id="export-students" class="btn btn-accent">Export Student List</button>
+                            </div>
+                        </div>
+
+                        <!-- Questions Management Panel -->
+                        <div id="questions-panel" class="tab-pane">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h4>Questions Management</h4>
+                                </div>
+                                <div class="card-body">
+                                    <!-- Quick Actions -->
+                                    <div class="row mb-4">
+                                        <div class="col-md-12">
+                                            <div class="d-flex gap-2 mb-3">
+                                                <button id="bulk-upload-questions" class="btn btn-success">
+                                                    📤 Upload Questions (Bulk)
+                                                </button>
+                                                <button id="add-single-question" class="btn btn-primary">
+                                                    ➕ Add Single Question
+                                                </button>
+                                                <button id="clear-all-questions" class="btn btn-danger">
+                                                    🗑️ Clear All Questions
+                                                </button>
+                                            </div>
+                                            <div class="alert alert-info">
+                                                <strong>Note:</strong> All questions are stored locally and synced with Firebase in real-time.
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Bulk Upload Section -->
+                                    <div id="bulk-upload-section" class="mb-4 p-3 border rounded" style="display: none;">
+                                        <h5>Bulk Upload Questions</h5>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="form-group">
+                                                    <label class="form-label">Select Class:</label>
+                                                    <select id="bulk-upload-class" class="form-select">
+                                                        <option value="">Select Class</option>
+                                                        <option value="JSS1">JSS 1</option>
+                                                        <option value="JSS2">JSS 2</option>
+                                                        <option value="JSS3">JSS 3</option>
+                                                        <option value="SS1">SS 1</option>
+                                                        <option value="SS2">SS 2</option>
+                                                        <option value="SS3">SS 3</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="form-group">
+                                                    <label class="form-label">Upload JSON File:</label>
+                                                    <input type="file" id="questions-json-file" class="form-control" accept=".json">
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="form-label">JSON Format:</label>
+                                            <textarea class="form-control" rows="6" readonly>
+[
+  {
+    "question": "What is 2 + 2?",
+    "options": ["3", "4", "5", "6"],
+    "correct": 1
+  },
+  {
+    "question": "What is the capital of France?",
+    "options": ["London", "Berlin", "Paris", "Madrid"],
+    "correct": 2
+  }
+]
+                                            </textarea>
+                                        </div>
+                                        <div class="alert alert-warning">
+                                            <strong>Important:</strong> 
+                                            <ul class="mb-0">
+                                                <li>JSON must be an array of question objects</li>
+                                                <li>Each question must have: question (string), options (array of 4 strings), correct (number 0-3)</li>
+                                                <li>Correct answer index: 0 = Option A, 1 = Option B, 2 = Option C, 3 = Option D</li>
+                                            </ul>
+                                        </div>
+                                        <div class="d-flex gap-2">
+                                            <button id="process-bulk-upload" class="btn btn-success">Process Upload</button>
+                                            <button id="cancel-bulk-upload" class="btn btn-secondary">Cancel</button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Single Question Section -->
+                                    <div id="single-question-section" class="mb-4 p-3 border rounded" style="display: none;">
+                                        <h5>Add Single Question</h5>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="form-group">
+                                                    <label class="form-label">Select Class:</label>
+                                                    <select id="single-question-class" class="form-select">
+                                                        <option value="">Select Class</option>
+                                                        <option value="JSS1">JSS 1</option>
+                                                        <option value="JSS2">JSS 2</option>
+                                                        <option value="JSS3">JSS 3</option>
+                                                        <option value="SS1">SS 1</option>
+                                                        <option value="SS2">SS 2</option>
+                                                        <option value="SS3">SS 3</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="form-label">Question:</label>
+                                            <textarea id="single-question-text" class="form-control" rows="3" placeholder="Enter question text"></textarea>
+                                        </div>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="form-group">
+                                                    <label class="form-label">Option A:</label>
+                                                    <input type="text" id="option-a" class="form-control" placeholder="Enter option A">
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="form-group">
+                                                    <label class="form-label">Option B:</label>
+                                                    <input type="text" id="option-b" class="form-control" placeholder="Enter option B">
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="form-group">
+                                                    <label class="form-label">Option C:</label>
+                                                    <input type="text" id="option-c" class="form-control" placeholder="Enter option C">
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="form-group">
+                                                    <label class="form-label">Option D:</label>
+                                                    <input type="text" id="option-d" class="form-control" placeholder="Enter option D">
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="form-group">
+                                                    <label class="form-label">Correct Answer:</label>
+                                                    <select id="correct-answer" class="form-select">
+                                                        <option value="0">Option A</option>
+                                                        <option value="1">Option B</option>
+                                                        <option value="2">Option C</option>
+                                                        <option value="3">Option D</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="d-flex gap-2">
+                                            <button id="save-single-question" class="btn btn-success">Save Question</button>
+                                            <button id="cancel-single-question" class="btn btn-secondary">Cancel</button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Current Questions Overview -->
+                                    <div class="card mt-4">
+                                        <div class="card-header">
+                                            <h6>Current Questions Overview</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="row" id="questions-overview">
+                                                <!-- Questions overview will be loaded here dynamically -->
+                                                <div class="col-md-12">
+                                                    <p class="text-muted">Loading questions overview...</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
