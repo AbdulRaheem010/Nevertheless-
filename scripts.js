@@ -19,38 +19,301 @@ let realTimeEnabled = false;
 
 // Initialize Firebase
 try {
-    app = firebase.initializeApp(firebaseConfig);
-    database = firebase.database();
-    console.log('Firebase initialized successfully');
-    console.log('Database URL:', firebaseConfig.databaseURL);
-    realTimeEnabled = true;
+    if (typeof firebase !== 'undefined') {
+        app = firebase.initializeApp(firebaseConfig);
+        database = firebase.database();
+        console.log('Firebase initialized successfully');
+        realTimeEnabled = true;
+        
+        // Initialize real-time listeners
+        initializeRealTimeListeners();
+    } else {
+        console.warn('Firebase SDK not loaded - running in offline mode');
+        realTimeEnabled = false;
+    }
 } catch (error) {
     console.error('Firebase initialization error:', error);
     realTimeEnabled = false;
 }
 
+// ==================== REAL-TIME DATA SYNC ====================
+
+function initializeRealTimeListeners() {
+    if (!realTimeEnabled) return;
+    
+    console.log('Setting up real-time listeners...');
+    
+    // Listen for student data changes
+    database.ref('students').on('value', (snapshot) => {
+        const firebaseStudents = snapshot.val();
+        if (firebaseStudents && Array.isArray(firebaseStudents)) {
+            students = firebaseStudents;
+            localStorage.setItem('students', JSON.stringify(students));
+            console.log('Students updated from Firebase in real-time');
+            
+            if (document.getElementById('admin-dashboard')?.style.display === 'block') {
+                loadStudents();
+            }
+        }
+    });
+    
+    // Listen for exam results changes
+    database.ref('examResults').on('value', (snapshot) => {
+        const resultsData = snapshot.val();
+        let results = [];
+        
+        if (resultsData) {
+            Object.keys(resultsData).forEach(key => {
+                results.push({
+                    ...resultsData[key],
+                    firebaseKey: key
+                });
+            });
+            localStorage.setItem('examResults', JSON.stringify(results));
+            console.log('Exam results updated from Firebase in real-time');
+            
+            if (document.getElementById('admin-dashboard')?.style.display === 'block') {
+                loadAdminResults();
+            }
+        }
+    });
+    
+    // Listen for signature changes
+    database.ref('signatures').on('value', (snapshot) => {
+        const firebaseSignatures = snapshot.val();
+        if (firebaseSignatures) {
+            signatureData = firebaseSignatures;
+            localStorage.setItem('signatureData', JSON.stringify(signatureData));
+            console.log('Signatures updated from Firebase in real-time');
+            loadSignatures();
+        }
+    });
+    
+    // Listen for question database changes
+    database.ref('questions').on('value', (snapshot) => {
+        const firebaseQuestions = snapshot.val();
+        if (firebaseQuestions) {
+            Object.keys(firebaseQuestions).forEach(className => {
+                questionsDatabase[className] = firebaseQuestions[className];
+            });
+            localStorage.setItem('questionsDatabase', JSON.stringify(questionsDatabase));
+            console.log('Questions updated from Firebase in real-time');
+            showRealTimeNotification('📚 Question database updated from server');
+        }
+    });
+    
+    // Listen for admin corrections
+    database.ref('admin/corrections').on('value', (snapshot) => {
+        const corrections = snapshot.val();
+        if (corrections) {
+            handleAdminCorrections(corrections);
+        }
+    });
+}
+
+function handleAdminCorrections(corrections) {
+    if (!corrections) return;
+    
+    console.log('Admin corrections received:', corrections);
+    
+    if (corrections.message) {
+        showRealTimeNotification(`📢 Admin: ${corrections.message}`);
+    }
+    
+    if (corrections.updatedQuestions) {
+        corrections.updatedQuestions.forEach(update => {
+            applyQuestionUpdate(update);
+        });
+    }
+}
+
+function applyQuestionUpdate(update) {
+    const { class: className, questionIndex, field, newValue } = update;
+    
+    if (questionsDatabase[className] && questionsDatabase[className][questionIndex]) {
+        if (field === 'question') {
+            questionsDatabase[className][questionIndex].question = newValue;
+        } else if (field === 'options') {
+            questionsDatabase[className][questionIndex].options = newValue;
+        } else if (field === 'correct') {
+            questionsDatabase[className][questionIndex].correct = parseInt(newValue);
+        }
+        
+        localStorage.setItem('questionsDatabase', JSON.stringify(questionsDatabase));
+        
+        if (currentState.selectedClass === className && document.getElementById('exam-interface')?.style.display === 'block') {
+            loadQuestion(currentState.currentQuestion);
+        }
+        
+        showRealTimeNotification(`📝 Question updated for ${className}`);
+    }
+}
+
+// ==================== ENHANCED FIREBASE FUNCTIONS ====================
+
+async function saveStudentsToFirebase() {
+    if (!realTimeEnabled) {
+        localStorage.setItem('students', JSON.stringify(students));
+        return;
+    }
+    
+    try {
+        await database.ref('students').set(students);
+        console.log('Students saved to Firebase');
+    } catch (error) {
+        console.error('Error saving students to Firebase:', error);
+        localStorage.setItem('students', JSON.stringify(students));
+    }
+}
+
+async function loadStudentsFromFirebase() {
+    if (!realTimeEnabled) {
+        const localStudents = JSON.parse(localStorage.getItem('students') || '[]');
+        students = localStudents;
+        return students;
+    }
+    
+    try {
+        const snapshot = await database.ref('students').once('value');
+        const firebaseStudents = snapshot.val();
+        
+        if (firebaseStudents && Array.isArray(firebaseStudents)) {
+            students = firebaseStudents;
+            console.log('Students loaded from Firebase');
+        } else {
+            const localStudents = JSON.parse(localStorage.getItem('students') || '[]');
+            students = localStudents;
+            if (localStudents.length > 0) {
+                await saveStudentsToFirebase();
+            }
+        }
+        return students;
+    } catch (error) {
+        console.error('Error loading students from Firebase:', error);
+        const localStudents = JSON.parse(localStorage.getItem('students') || '[]');
+        students = localStudents;
+        return students;
+    }
+}
+
+async function saveExamResultToFirebase(result) {
+    if (!realTimeEnabled) {
+        let results = JSON.parse(localStorage.getItem('examResults') || '[]');
+        results.push(result);
+        localStorage.setItem('examResults', JSON.stringify(results));
+        return;
+    }
+    
+    try {
+        const resultRef = database.ref('examResults').push();
+        await resultRef.set({
+            ...result,
+            firebaseKey: resultRef.key,
+            syncTimestamp: firebase.database.ServerValue.TIMESTAMP
+        });
+        console.log('Exam result saved to Firebase');
+    } catch (error) {
+        console.error('Error saving exam result to Firebase:', error);
+        let results = JSON.parse(localStorage.getItem('examResults') || '[]');
+        results.push(result);
+        localStorage.setItem('examResults', JSON.stringify(results));
+    }
+}
+
+async function loadExamResultsFromFirebase() {
+    if (!realTimeEnabled) {
+        return JSON.parse(localStorage.getItem('examResults') || '[]');
+    }
+    
+    try {
+        const snapshot = await database.ref('examResults').once('value');
+        const resultsData = snapshot.val();
+        let results = [];
+        
+        if (resultsData) {
+            Object.keys(resultsData).forEach(key => {
+                results.push({
+                    ...resultsData[key],
+                    firebaseKey: key
+                });
+            });
+            console.log('Exam results loaded from Firebase');
+        } else {
+            results = JSON.parse(localStorage.getItem('examResults') || '[]');
+        }
+        return results;
+    } catch (error) {
+        console.error('Error loading exam results from Firebase:', error);
+        return JSON.parse(localStorage.getItem('examResults') || '[]');
+    }
+}
+
+async function saveSignaturesToFirebase() {
+    if (!realTimeEnabled) {
+        localStorage.setItem('signatureData', JSON.stringify(signatureData));
+        return;
+    }
+    
+    try {
+        await database.ref('signatures').set({
+            ...signatureData,
+            syncTimestamp: firebase.database.ServerValue.TIMESTAMP
+        });
+        console.log('Signatures saved to Firebase');
+    } catch (error) {
+        console.error('Error saving signatures to Firebase:', error);
+        localStorage.setItem('signatureData', JSON.stringify(signatureData));
+    }
+}
+
+async function loadSignaturesFromFirebase() {
+    if (!realTimeEnabled) {
+        const localSignatures = JSON.parse(localStorage.getItem('signatureData') || '{}');
+        signatureData = localSignatures;
+        return signatureData;
+    }
+    
+    try {
+        const snapshot = await database.ref('signatures').once('value');
+        const firebaseSignatures = snapshot.val();
+        
+        if (firebaseSignatures) {
+            signatureData = firebaseSignatures;
+            console.log('Signatures loaded from Firebase');
+        } else {
+            const localSignatures = JSON.parse(localStorage.getItem('signatureData') || '{}');
+            signatureData = localSignatures;
+        }
+        return signatureData;
+    } catch (error) {
+        console.error('Error loading signatures from Firebase:', error);
+        const localSignatures = JSON.parse(localStorage.getItem('signatureData') || '{}');
+        signatureData = localSignatures;
+        return signatureData;
+    }
+}
+
 // ==================== QUESTIONS DATABASE ====================
 
-// Questions Database
 const questionsDatabase = {
     "JSS1": [
         { question: "What is Scratch primarily used for?", options: ["Creating games and animations", "Writing documents", "Browsing the internet", "Sending emails"], correct: 0 },
         { question: "Which programming language does Scratch use?", options: ["Python", "Block-based visual programming", "Java", "C++"], correct: 1 },
         { question: "What is a sprite in Scratch?", options: ["A background image", "A character or object that can be programmed", "A sound effect", "A type of block"], correct: 1 },
-        { question: "Which block category controls sprite movement in Scratch?", options: ["Looks", "Motion", "Sound", "Events"], correct: 1 },
+        { question: "What is the primary function of the Enter key?", options: ["To delete text", "To give spaces between words", "To start execution or submit a command", "To open search functions"], correct: 2 },
         { question: "What does the green flag do in Scratch?", options: ["Stops the program", "Starts the program", "Saves the project", "Deletes the sprite"], correct: 1 },
-        { question: "Which block would you use to make a sprite say something?", options: ["Say block", "Tell block", "Speak block", "Talk block"], correct: 0 },
+        { question: "Which key is described as 'the largest key' on the keyboard?", options: ["Enter key","Backspace key","Space bar key","Function key"],correct: 2 },
         { question: "What is the stage in Scratch?", options: ["A sprite", "The background area where sprites perform", "A type of block", "A sound"], correct: 1 },
-        { question: "How do you make a sprite face a different direction?", options: ["Use the Motion blocks", "Use the Sound blocks", "Use the Pen blocks", "Delete and recreate it"], correct: 0 },
+        { question: "What does the Backspace key primarily do?", options: ["Create new folders","Refresh the computer screen","Delete what was just typed", "Start a slideshow"],correct: 2 },
         { question: "What is a costume in Scratch?", options: ["A different appearance for a sprite", "A type of sound", "A background", "A variable"], correct: 0 },
-        { question: "Which block category would you use to play music?", options: ["Motion", "Looks", "Sound", "Events"], correct: 2 },
-        { question: "What does the 'wait' block do?", options: ["Stops the program permanently", "Pauses the script for a specified time", "Speeds up the sprite", "Deletes the sprite"], correct: 1 },
+        { question: "Which function key is typically used to open search within a program?", options: ["F1","F2", "F3","F4"], correct: 2 },
+        { question: "What is the main purpose of refreshing your computer screen?", options: ["To turn off the computer","To create new folders","To see the most current version of content","To edit cell content in Excel"], correct: 2 },
         { question: "How do you add a new sprite to your project?", options: ["Press the green flag", "Click the 'Choose a Sprite' button", "Press delete", "Right-click the stage"], correct: 1 },
-        { question: "What color are the Motion blocks in Scratch?", options: ["Purple", "Blue", "Green", "Orange"], correct: 1 },
-        { question: "Which block makes a sprite invisible?", options: ["Show", "Hide", "Disappear", "Remove"], correct: 1 },
-        { question: "What is the purpose of the Events category?", options: ["To move sprites", "To start scripts when something happens", "To change colors", "To save projects"], correct: 1 },
+        { question: "Where is the power button typically located on a desktop computer?", options: [ "Only on the front of the computer case","Only on the keyboard","On the front of the computer case or sometimes on the side/back of monitor","Exclusively on the monitor"],correct: 2 },
+        { question: "What is the first step in creating a new folder?", options: ["Right-click on an empty area","Press the Enter key","Go to the desired location","Type a name for the folder"], correct: 2 },
+        { question: "Which function key is used to refresh or reload a website in a browser?", options: ["F2","F3","F4", "F5"], correct: 3 },
         { question: "How do you stop all scripts in Scratch?", options: ["Green flag", "Red stop sign", "Yellow pause button", "Blue play button"], correct: 1 },
-        { question: "Which block would you use to point a sprite towards the mouse?", options: ["Point in direction", "Point towards", "Go to mouse", "Follow mouse"], correct: 1 },
+        { question: "After right-clicking to create a new folder, what should you do next?", options: ["Press the Space bar","Hover over 'New' and select 'Folder'","Use the Backspace key","Press F1 for help"], correct: 1 },
         { question: "What does the 'glide' block do?", options: ["Makes sprite jump", "Moves sprite smoothly to a position", "Rotates sprite", "Changes sprite color"], correct: 1 },
         { question: "How many sprites can you have in a Scratch project?", options: ["Only 1", "Up to 10", "Up to 100", "Unlimited"], correct: 3 },
         { question: "What is a backdrop in Scratch?", options: ["A sprite costume", "A background image for the stage", "A type of sound", "A programming block"], correct: 1 },
@@ -229,7 +492,6 @@ const questionsDatabase = {
 
 // ==================== APPLICATION STATE ====================
 
-// Application State
 let currentState = {
     studentId: null,
     studentName: null,
@@ -242,13 +504,11 @@ let currentState = {
     timerInterval: null
 };
 
-// Signature Data
 let signatureData = {
     coordinator: null,
     principal: null
 };
 
-// Google Sheets Configuration
 const GOOGLE_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLScsKB8oALiOa1wz3EDVLGY_Ypc6RF_qxfffPmsQqpLYlLA7UA/formResponse';
 const FORM_FIELD_IDS = {
     studentId: 'entry.535636626',
@@ -261,935 +521,11 @@ const FORM_FIELD_IDS = {
     date: 'entry.535860245'
 };
 
-// Initialize students
 let students = [];
-
-// ==================== FIREBASE DATABASE FUNCTIONS ====================
-
-// Save students to Firebase
-async function saveStudentsToFirebase() {
-    if (!realTimeEnabled) {
-        console.log('Firebase not available, using localStorage');
-        localStorage.setItem('students', JSON.stringify(students));
-        return;
-    }
-    
-    try {
-        await database.ref('students').set(students);
-        console.log('Students saved to Firebase');
-    } catch (error) {
-        console.error('Error saving students to Firebase:', error);
-        // Fallback to localStorage
-        localStorage.setItem('students', JSON.stringify(students));
-    }
-}
-
-// Load students from Firebase
-async function loadStudentsFromFirebase() {
-    if (!realTimeEnabled) {
-        console.log('Loading from localStorage');
-        const localStudents = JSON.parse(localStorage.getItem('students') || '[]');
-        students = localStudents;
-        return students;
-    }
-    
-    try {
-        const snapshot = await database.ref('students').once('value');
-        const firebaseStudents = snapshot.val();
-        
-        if (firebaseStudents && Array.isArray(firebaseStudents)) {
-            students = firebaseStudents;
-            console.log('Students loaded from Firebase');
-        } else {
-            // If no data in Firebase, use localStorage and sync to Firebase
-            const localStudents = JSON.parse(localStorage.getItem('students') || '[]');
-            students = localStudents;
-            if (localStudents.length > 0) {
-                await saveStudentsToFirebase();
-            }
-        }
-        return students;
-    } catch (error) {
-        console.error('Error loading students from Firebase:', error);
-        // Fallback to localStorage
-        const localStudents = JSON.parse(localStorage.getItem('students') || '[]');
-        students = localStudents;
-        return students;
-    }
-}
-
-// Save exam results to Firebase
-async function saveExamResultToFirebase(result) {
-    if (!realTimeEnabled) {
-        console.log('Saving result to localStorage');
-        let results = JSON.parse(localStorage.getItem('examResults') || '[]');
-        results.push(result);
-        localStorage.setItem('examResults', JSON.stringify(results));
-        return;
-    }
-    
-    try {
-        const resultRef = database.ref('examResults').push();
-        await resultRef.set({
-            ...result,
-            firebaseKey: resultRef.key,
-            syncTimestamp: firebase.database.ServerValue.TIMESTAMP
-        });
-        console.log('Exam result saved to Firebase');
-    } catch (error) {
-        console.error('Error saving exam result to Firebase:', error);
-        // Fallback to localStorage
-        let results = JSON.parse(localStorage.getItem('examResults') || '[]');
-        results.push(result);
-        localStorage.setItem('examResults', JSON.stringify(results));
-    }
-}
-
-// Load exam results from Firebase
-async function loadExamResultsFromFirebase() {
-    if (!realTimeEnabled) {
-        console.log('Loading results from localStorage');
-        return JSON.parse(localStorage.getItem('examResults') || '[]');
-    }
-    
-    try {
-        const snapshot = await database.ref('examResults').once('value');
-        const resultsData = snapshot.val();
-        let results = [];
-        
-        if (resultsData) {
-            Object.keys(resultsData).forEach(key => {
-                results.push({
-                    ...resultsData[key],
-                    firebaseKey: key
-                });
-            });
-            console.log('Exam results loaded from Firebase');
-        } else {
-            // If no data in Firebase, use localStorage
-            results = JSON.parse(localStorage.getItem('examResults') || '[]');
-        }
-        return results;
-    } catch (error) {
-        console.error('Error loading exam results from Firebase:', error);
-        return JSON.parse(localStorage.getItem('examResults') || '[]');
-    }
-}
-
-// Save signatures to Firebase
-async function saveSignaturesToFirebase() {
-    if (!realTimeEnabled) {
-        console.log('Saving signatures to localStorage');
-        localStorage.setItem('signatureData', JSON.stringify(signatureData));
-        return;
-    }
-    
-    try {
-        await database.ref('signatures').set({
-            ...signatureData,
-            syncTimestamp: firebase.database.ServerValue.TIMESTAMP
-        });
-        console.log('Signatures saved to Firebase');
-    } catch (error) {
-        console.error('Error saving signatures to Firebase:', error);
-        localStorage.setItem('signatureData', JSON.stringify(signatureData));
-    }
-}
-
-// Load signatures from Firebase
-async function loadSignaturesFromFirebase() {
-    if (!realTimeEnabled) {
-        console.log('Loading signatures from localStorage');
-        const localSignatures = JSON.parse(localStorage.getItem('signatureData') || '{}');
-        signatureData = localSignatures;
-        return signatureData;
-    }
-    
-    try {
-        const snapshot = await database.ref('signatures').once('value');
-        const firebaseSignatures = snapshot.val();
-        
-        if (firebaseSignatures) {
-            signatureData = firebaseSignatures;
-            console.log('Signatures loaded from Firebase');
-        } else {
-            // If no data in Firebase, use localStorage
-            const localSignatures = JSON.parse(localStorage.getItem('signatureData') || '{}');
-            signatureData = localSignatures;
-        }
-        return signatureData;
-    } catch (error) {
-        console.error('Error loading signatures from Firebase:', error);
-        const localSignatures = JSON.parse(localStorage.getItem('signatureData') || '{}');
-        signatureData = localSignatures;
-        return signatureData;
-    }
-}
-
-// ==================== DOM ELEMENTS ====================
-
-// DOM Elements
-const studentLogin = document.getElementById('student-login');
-const classSelection = document.getElementById('class-selection');
-const examInterface = document.getElementById('exam-interface');
-const resultsScreen = document.getElementById('results-screen');
-const adminLogin = document.getElementById('admin-login');
-const adminDashboard = document.getElementById('admin-dashboard');
-const armsSelection = document.getElementById('arms-selection');
-const armsContainer = document.getElementById('arms-container');
-const classSelectButtons = document.querySelectorAll('.class-select');
-const startExamBtn = document.getElementById('start-exam-btn');
-const adminLoginBtn = document.getElementById('admin-login-btn');
-const studentLoginBtn = document.getElementById('student-login-btn');
-const loginBtn = document.getElementById('login-btn');
-const backToLogin = document.getElementById('back-to-login');
-const backToStudentLogin = document.getElementById('back-to-student-login');
-const logoutBtn = document.getElementById('logout-btn');
-const logoutAfterExam = document.getElementById('logout-after-exam');
-const exportResultsBtn = document.getElementById('export-results');
-const classSelectAdmin = document.getElementById('class-select-admin');
-const armSelectAdmin = document.getElementById('arm-select-admin');
-const adminResults = document.getElementById('admin-results');
-const prevBtn = document.getElementById('prev-btn');
-const nextBtn = document.getElementById('next-btn');
-const submitExamBtn = document.getElementById('submit-exam-btn');
-const retakeExamBtn = document.getElementById('retake-exam-btn');
-const questionsContainer = document.getElementById('questions-container');
-const questionNav = document.getElementById('question-nav');
-const examTimer = document.getElementById('exam-timer');
-const examTitle = document.getElementById('exam-title');
-const studentInfo = document.getElementById('student-info');
-const studentExamInfo = document.getElementById('student-exam-info');
-const studentResultInfo = document.getElementById('student-result-info');
-const scoreDisplay = document.getElementById('score-display');
-const resultMessage = document.getElementById('result-message');
-const studentIdInput = document.getElementById('student-id');
-const studentNameInput = document.getElementById('student-name');
-const printResultBtn = document.getElementById('print-result-btn');
-const printAdminResultsBtn = document.getElementById('print-admin-results');
-const addStudentBtn = document.getElementById('add-student-btn');
-const filterClass = document.getElementById('filter-class');
-const filterArm = document.getElementById('filter-arm');
-const searchStudent = document.getElementById('search-student');
-const studentsList = document.getElementById('students-list');
-const exportStudentsBtn = document.getElementById('export-students');
-const tabButtons = document.querySelectorAll('.tab-button');
-const importFile = document.getElementById('import-file');
-const importStudentsBtn = document.getElementById('import-students-btn');
-const importPreview = document.getElementById('import-preview');
-
-// New Elements for Enhanced Features
-const keyboardHelpBtn = document.getElementById('keyboard-help-btn');
-const closeKeyboardHelp = document.getElementById('close-keyboard-help');
-const continueSessionBtn = document.getElementById('continue-session-btn');
-const logoutModalBtn = document.getElementById('logout-modal-btn');
-const backupDataBtn = document.getElementById('backup-data-btn');
-const restoreDataBtn = document.getElementById('restore-data-btn');
-const testFirebaseBtn = document.getElementById('test-firebase-btn');
-const broadcastBtn = document.getElementById('broadcast-btn');
-const quickCorrectionBtn = document.getElementById('quick-correction-btn');
-
-// Signature Elements
-const coordinatorUpload = document.getElementById('coordinator-signature-upload');
-const principalUpload = document.getElementById('principal-signature-upload');
-const removeCoordinatorBtn = document.getElementById('remove-coordinator-signature');
-const removePrincipalBtn = document.getElementById('remove-principal-signature');
-const coordinatorPreview = document.getElementById('coordinator-preview');
-const principalPreview = document.getElementById('principal-preview');
-
-// New Elements for Data Management
-const clearAllStudentsBtn = document.getElementById('clear-all-students');
-const clearAllResultsBtn = document.getElementById('clear-all-results');
-const clearAllQuestionsBtn = document.getElementById('clear-all-questions');
-const bulkUploadQuestionsBtn = document.getElementById('bulk-upload-questions');
-const addSingleQuestionBtn = document.getElementById('add-single-question');
-const bulkUploadSection = document.getElementById('bulk-upload-section');
-const singleQuestionSection = document.getElementById('single-question-section');
-const questionsJsonFile = document.getElementById('questions-json-file');
-const bulkUploadClass = document.getElementById('bulk-upload-class');
-const processBulkUploadBtn = document.getElementById('process-bulk-upload');
-const cancelBulkUploadBtn = document.getElementById('cancel-bulk-upload');
-const singleQuestionClass = document.getElementById('single-question-class');
-const singleQuestionText = document.getElementById('single-question-text');
-const optionA = document.getElementById('option-a');
-const optionB = document.getElementById('option-b');
-const optionC = document.getElementById('option-c');
-const optionD = document.getElementById('option-d');
-const correctAnswer = document.getElementById('correct-answer');
-const saveSingleQuestionBtn = document.getElementById('save-single-question');
-const cancelSingleQuestionBtn = document.getElementById('cancel-single-question');
-const viewAutoRegisteredBtn = document.getElementById('view-auto-registered');
-
-// ==================== FIREBASE REAL-TIME FUNCTIONS ====================
-
-// Real-time Database Functions
-function initializeRealTimeUpdates() {
-    if (!app || !database) {
-        console.log('Firebase not available - running in offline mode');
-        realTimeEnabled = false;
-        return;
-    }
-    
-    try {
-        // Listen for admin corrections
-        database.ref('admin/corrections').on('value', (snapshot) => {
-            const corrections = snapshot.val();
-            if (corrections) {
-                handleAdminCorrections(corrections);
-            }
-        });
-        
-        // Listen for question updates
-        database.ref('questions').on('value', (snapshot) => {
-            const updatedQuestions = snapshot.val();
-            if (updatedQuestions) {
-                updateQuestionsFromFirebase(updatedQuestions);
-            }
-        });
-        
-        realTimeEnabled = true;
-        console.log('Real-time updates enabled');
-        showRealTimeNotification('Real-time updates activated');
-        
-    } catch (error) {
-        console.error('Error initializing real-time updates:', error);
-        realTimeEnabled = false;
-    }
-}
-
-// Handle admin corrections
-function handleAdminCorrections(corrections) {
-    if (!corrections) return;
-    
-    console.log('Admin corrections received:', corrections);
-    
-    // Show notification for general corrections
-    if (corrections.message) {
-        showRealTimeNotification(`📢 Admin: ${corrections.message}`);
-    }
-    
-    // Handle question updates
-    if (corrections.updatedQuestions) {
-        corrections.updatedQuestions.forEach(update => {
-            applyQuestionUpdate(update);
-        });
-    }
-    
-    // Handle practical score updates
-    if (corrections.updatedScores) {
-        corrections.updatedScores.forEach(scoreUpdate => {
-            updatePracticalScoreRealTime(scoreUpdate);
-        });
-    }
-    
-    // Handle student updates
-    if (corrections.updatedStudents) {
-        corrections.updatedStudents.forEach(studentUpdate => {
-            updateStudentsRealTime(studentUpdate);
-        });
-    }
-}
-
-// Apply question updates from admin
-function applyQuestionUpdate(update) {
-    const { class: className, questionIndex, field, newValue } = update;
-    
-    if (questionsDatabase[className] && questionsDatabase[className][questionIndex]) {
-        // Update the question
-        if (field === 'question') {
-            questionsDatabase[className][questionIndex].question = newValue;
-        } else if (field === 'options') {
-            questionsDatabase[className][questionIndex].options = newValue;
-        } else if (field === 'correct') {
-            questionsDatabase[className][questionIndex].correct = parseInt(newValue);
-        }
-        
-        // Update localStorage
-        localStorage.setItem('questionsDatabase', JSON.stringify(questionsDatabase));
-        
-        // If this question is currently being displayed, update it
-        if (currentState.selectedClass === className && examInterface.style.display === 'block') {
-            loadQuestion(currentState.currentQuestion);
-        }
-        
-        showRealTimeNotification(`📝 Question updated for ${className}`);
-    }
-}
-
-// Update questions from Firebase
-function updateQuestionsFromFirebase(updatedQuestions) {
-    // Merge updated questions with local database
-    for (const className in updatedQuestions) {
-        if (questionsDatabase[className]) {
-            questionsDatabase[className] = updatedQuestions[className];
-        }
-    }
-    
-    // Update localStorage
-    localStorage.setItem('questionsDatabase', JSON.stringify(questionsDatabase));
-    showRealTimeNotification('📚 Question database updated from server');
-}
-
-// Update practical scores in real-time
-function updatePracticalScoreRealTime(scoreUpdate) {
-    const { studentId, timestamp, practicalScore } = scoreUpdate;
-    
-    let results = JSON.parse(localStorage.getItem('examResults') || '[]');
-    const resultIndex = results.findIndex(r => 
-        r.studentId === studentId && r.timestamp === timestamp
-    );
-    
-    if (resultIndex !== -1) {
-        results[resultIndex].practicalScore = practicalScore;
-        
-        const theoryMarks = results[resultIndex].theoryMarks;
-        const totalMarks = theoryMarks + practicalScore;
-        const percentage = (totalMarks / 100) * 100;
-        
-        let grade = '';
-        if (percentage >= 90) grade = 'A+ (Excellent)';
-        else if (percentage >= 80) grade = 'A (Very Good)';
-        else if (percentage >= 70) grade = 'B (Good)';
-        else if (percentage >= 60) grade = 'C (Fair)';
-        else if (percentage >= 50) grade = 'D (Pass)';
-        else grade = 'F (Fail)';
-        
-        results[resultIndex].totalMarks = totalMarks;
-        results[resultIndex].percentage = percentage.toFixed(1);
-        results[resultIndex].grade = grade;
-        
-        localStorage.setItem('examResults', JSON.stringify(results));
-        
-        // Refresh admin results if open
-        if (adminDashboard.style.display === 'block') {
-            loadAdminResults();
-        }
-        
-        showRealTimeNotification(`📊 Practical score updated for student ${studentId}`);
-    }
-}
-
-// Update students list in real-time
-function updateStudentsRealTime(studentUpdate) {
-    const { action, student } = studentUpdate;
-    
-    if (action === 'add') {
-        // Add new student
-        if (!students.some(s => s.id === student.id)) {
-            students.push(student);
-            localStorage.setItem('students', JSON.stringify(students));
-            showRealTimeNotification(`👨‍🎓 New student added: ${student.name}`);
-        }
-    } else if (action === 'delete') {
-        // Remove student
-        students = students.filter(s => s.id !== student.id);
-        localStorage.setItem('students', JSON.stringify(students));
-        showRealTimeNotification(`🗑️ Student removed: ${student.name}`);
-    }
-    
-    // Refresh students list if admin dashboard is open
-    if (adminDashboard.style.display === 'block') {
-        loadStudents();
-    }
-}
-
-// ==================== ADMIN REAL-TIME FUNCTIONS ====================
-
-// Send admin correction
-async function sendAdminCorrection(message) {
-    if (!realTimeEnabled) {
-        alert('Real-time updates not enabled. Please check Firebase configuration.');
-        return;
-    }
-    
-    const correction = {
-        message: message,
-        timestamp: new Date().toISOString(),
-        admin: 'Administrator'
-    };
-    
-    try {
-        await database.ref('admin/corrections').set(correction);
-        console.log('Correction sent successfully');
-        showRealTimeNotification('📢 Message sent to all users');
-    } catch (error) {
-        console.error('Error sending correction:', error);
-        alert('Error sending correction: ' + error.message);
-    }
-}
-
-// Update question in real-time
-async function updateQuestionRealTime(className, questionIndex, field, newValue) {
-    if (!realTimeEnabled) {
-        alert('Real-time updates not enabled');
-        return;
-    }
-    
-    const update = {
-        class: className,
-        questionIndex: questionIndex,
-        field: field,
-        newValue: newValue,
-        timestamp: new Date().toISOString()
-    };
-    
-    // Update local database first
-    if (questionsDatabase[className] && questionsDatabase[className][questionIndex]) {
-        if (field === 'question') {
-            questionsDatabase[className][questionIndex].question = newValue;
-        } else if (field === 'options') {
-            questionsDatabase[className][questionIndex].options = newValue;
-        } else if (field === 'correct') {
-            questionsDatabase[className][questionIndex].correct = parseInt(newValue);
-        }
-        
-        localStorage.setItem('questionsDatabase', JSON.stringify(questionsDatabase));
-    }
-    
-    // Send to all users
-    try {
-        await database.ref('admin/corrections').set({
-            updatedQuestions: [update],
-            timestamp: new Date().toISOString(),
-            admin: 'Administrator'
-        });
-        showRealTimeNotification(`📝 Question updated for ${className}`);
-    } catch (error) {
-        console.error('Error updating question:', error);
-    }
-}
-
-// Enhanced student management with real-time
-async function addStudentRealTime() {
-    const studentId = document.getElementById('new-student-id').value.trim();
-    const studentName = document.getElementById('new-student-name').value.trim();
-    const studentClass = document.getElementById('new-student-class').value;
-    const studentArm = document.getElementById('new-student-arm').value;
-    
-    if (!studentId || !studentName || !studentClass || !studentArm) {
-        alert('Please fill all required fields');
-        return;
-    }
-    
-    if (students.some(student => student.id === studentId)) {
-        alert('Student ID already exists');
-        return;
-    }
-    
-    const newStudent = {
-        id: studentId,
-        name: studentName,
-        class: studentClass,
-        arm: studentArm,
-        created: new Date().toISOString()
-    };
-    
-    // Add to students array
-    students.push(newStudent);
-    
-    // Save to Firebase
-    await saveStudentsToFirebase();
-    
-    // Clear form
-    document.getElementById('new-student-id').value = '';
-    document.getElementById('new-student-name').value = '';
-    document.getElementById('new-student-class').value = '';
-    document.getElementById('new-student-arm').value = '';
-    
-    loadStudents();
-    showRealTimeNotification(`👨‍🎓 Student added: ${studentName}`);
-}
-
-// Enhanced delete student with real-time
-async function deleteStudentRealTime(studentId) {
-    if (confirm('Are you sure you want to delete this student?')) {
-        students = students.filter(student => student.id !== studentId);
-        
-        // Save to Firebase
-        await saveStudentsToFirebase();
-        
-        loadStudents();
-        showRealTimeNotification(`🗑️ Student deleted: ${studentId}`);
-    }
-}
-
-// Enhanced practical score update with real-time
-async function updatePracticalScoreRealTimeAdmin(studentId, timestamp, practicalScore) {
-    if (!realTimeEnabled) {
-        // Fallback to local update only
-        updatePracticalScoreLocal(studentId, timestamp, practicalScore);
-        return;
-    }
-    
-    const scoreUpdate = {
-        studentId: studentId,
-        timestamp: timestamp,
-        practicalScore: practicalScore,
-        admin: 'Administrator',
-        updateTime: new Date().toISOString()
-    };
-    
-    // Update locally first
-    updatePracticalScoreLocal(studentId, timestamp, practicalScore);
-    
-    // Send real-time update
-    try {
-        await database.ref('admin/corrections').set({
-            updatedScores: [scoreUpdate],
-            timestamp: new Date().toISOString()
-        });
-        console.log('Practical score update sent to all users');
-    } catch (error) {
-        console.error('Error sending score update:', error);
-    }
-}
-
-function updatePracticalScoreLocal(studentId, timestamp, practicalScore) {
-    let results = JSON.parse(localStorage.getItem('examResults') || '[]');
-    const resultIndex = results.findIndex(r => 
-        r.studentId === studentId && r.timestamp === timestamp
-    );
-    
-    if (resultIndex !== -1) {
-        results[resultIndex].practicalScore = practicalScore;
-        
-        const theoryMarks = results[resultIndex].theoryMarks;
-        const totalMarks = theoryMarks + practicalScore;
-        const percentage = (totalMarks / 100) * 100;
-        
-        let grade = '';
-        if (percentage >= 90) grade = 'A+ (Excellent)';
-        else if (percentage >= 80) grade = 'A (Very Good)';
-        else if (percentage >= 70) grade = 'B (Good)';
-        else if (percentage >= 60) grade = 'C (Fair)';
-        else if (percentage >= 50) grade = 'D (Pass)';
-        else grade = 'F (Fail)';
-        
-        results[resultIndex].totalMarks = totalMarks;
-        results[resultIndex].percentage = percentage.toFixed(1);
-        results[resultIndex].grade = grade;
-        
-        localStorage.setItem('examResults', JSON.stringify(results));
-        loadAdminResults();
-    }
-}
-
-// Test Firebase connection
-async function testFirebaseConnection() {
-    if (!app) {
-        console.log('Firebase not initialized');
-        return false;
-    }
-    
-    try {
-        await database.ref('connectionTest').set({
-            timestamp: new Date().toISOString(),
-            message: 'CBT System Connected Successfully!',
-            status: 'Active'
-        });
-        console.log('Firebase connection test: SUCCESS');
-        showRealTimeNotification('Firebase connected successfully!');
-        return true;
-    } catch (error) {
-        console.error('Firebase connection test: FAILED', error);
-        alert('Firebase connection failed: ' + error.message);
-        return false;
-    }
-}
-
-// ==================== NOTIFICATION SYSTEM ====================
-
-// Enhanced notification system
-function showRealTimeNotification(message) {
-    // Create notification container if it doesn't exist
-    let notificationContainer = document.getElementById('real-time-notification-container');
-    if (!notificationContainer) {
-        notificationContainer = document.createElement('div');
-        notificationContainer.id = 'real-time-notification-container';
-        notificationContainer.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 10000;
-            max-width: 400px;
-        `;
-        document.body.appendChild(notificationContainer);
-    }
-    
-    const notification = document.createElement('div');
-    notification.className = 'real-time-notification';
-    notification.style.cssText = `
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 15px 20px;
-        margin-bottom: 10px;
-        border-radius: 10px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-        animation: slideInRight 0.3s ease-out;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        min-width: 300px;
-        font-family: Arial, sans-serif;
-        font-size: 14px;
-    `;
-    
-    notification.innerHTML = `
-        <div style="flex: 1;">
-            <div style="font-weight: bold; margin-bottom: 5px;">🔔 Real-time Update</div>
-            <div>${message}</div>
-            <div style="font-size: 11px; opacity: 0.8; margin-top: 5px;">
-                ${new Date().toLocaleTimeString()}
-            </div>
-        </div>
-        <button onclick="this.parentElement.remove()" 
-                style="background: none; border: none; color: white; cursor: pointer; margin-left: 15px; font-size: 18px;">
-            ✕
-        </button>
-    `;
-    
-    notificationContainer.appendChild(notification);
-    
-    // Auto-remove after 5 seconds
-    setTimeout(() => {
-        if (notification.parentElement) {
-            notification.style.animation = 'slideOutRight 0.3s ease-in';
-            setTimeout(() => notification.remove(), 300);
-        }
-    }, 5000);
-}
-
-// Add CSS animations
-const notificationStyle = document.createElement('style');
-notificationStyle.textContent = `
-    @keyframes slideInRight {
-        from {
-            transform: translateX(100%);
-            opacity: 0;
-        }
-        to {
-            transform: translateX(0);
-            opacity: 1;
-        }
-    }
-    
-    @keyframes slideOutRight {
-        from {
-            transform: translateX(0);
-            opacity: 1;
-        }
-        to {
-            transform: translateX(100%);
-            opacity: 0;
-        }
-    }
-    
-    .real-time-notification {
-        transition: all 0.3s ease;
-    }
-`;
-document.head.appendChild(notificationStyle);
-
-// ==================== EVENT LISTENERS ====================
-
-// Event Listeners
-document.addEventListener('DOMContentLoaded', function() {
-    initializeApp();
-});
-
-studentLoginBtn.addEventListener('click', studentLoginAction);
-adminLoginBtn.addEventListener('click', showAdminLogin);
-
-classSelectButtons.forEach(button => {
-    button.addEventListener('click', async function() {
-        const level = this.getAttribute('data-level');
-        
-        // Set the selected class
-        currentState.selectedClass = level;
-        
-        // Update student record if this is an auto-registered student
-        const student = students.find(s => s.id === currentState.studentId && s.name === currentState.studentName);
-        if (student && (student.autoRegistered || !student.class)) {
-            student.class = level;
-            student.arm = null; // Reset arm when class changes
-            await saveStudentsToFirebase();
-            console.log('Updated student class:', student);
-        }
-        
-        // Show arms selection
-        showArmsSelection(level);
-        
-        // Highlight the selected class
-        document.querySelectorAll('.class-select').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        this.classList.add('active');
-    });
-});
-
-startExamBtn.addEventListener('click', startExam);
-loginBtn.addEventListener('click', adminLoginAction);
-backToLogin.addEventListener('click', backToMainLogin);
-backToStudentLogin.addEventListener('click', backToMainLogin);
-logoutBtn.addEventListener('click', adminLogout);
-logoutAfterExam.addEventListener('click', backToMainLogin);
-exportResultsBtn.addEventListener('click', exportToExcel);
-classSelectAdmin.addEventListener('change', loadAdminResults);
-armSelectAdmin.addEventListener('change', loadAdminResults);
-prevBtn.addEventListener('click', showPreviousQuestion);
-nextBtn.addEventListener('click', showNextQuestion);
-submitExamBtn.addEventListener('click', submitExam);
-retakeExamBtn.addEventListener('click', retakeExam);
-printResultBtn.addEventListener('click', printStudentResult);
-printAdminResultsBtn.addEventListener('click', printAdminResults);
-addStudentBtn.addEventListener('click', addStudentRealTime);
-filterClass.addEventListener('change', loadStudents);
-filterArm.addEventListener('change', loadStudents);
-searchStudent.addEventListener('input', loadStudents);
-exportStudentsBtn.addEventListener('click', exportStudentsToExcel);
-importStudentsBtn.addEventListener('click', importStudentsFromFile);
-
-// New Event Listeners
-if (keyboardHelpBtn) {
-    keyboardHelpBtn.addEventListener('click', function() {
-        document.getElementById('keyboard-help-modal').style.display = 'flex';
-    });
-}
-
-if (closeKeyboardHelp) {
-    closeKeyboardHelp.addEventListener('click', function() {
-        document.getElementById('keyboard-help-modal').style.display = 'none';
-    });
-}
-
-if (continueSessionBtn) {
-    continueSessionBtn.addEventListener('click', function() {
-        document.getElementById('session-timeout-modal').style.display = 'none';
-        resetSessionTimer();
-    });
-}
-
-if (logoutModalBtn) {
-    logoutModalBtn.addEventListener('click', function() {
-        document.getElementById('session-timeout-modal').style.display = 'none';
-        backToMainLogin();
-    });
-}
-
-if (backupDataBtn) {
-    backupDataBtn.addEventListener('click', backupData);
-}
-
-if (restoreDataBtn) {
-    restoreDataBtn.addEventListener('click', restoreDataFromFile);
-}
-
-if (testFirebaseBtn) {
-    testFirebaseBtn.addEventListener('click', testYourFirebaseConnection);
-}
-
-if (broadcastBtn) {
-    broadcastBtn.addEventListener('click', sendBroadcastMessage);
-}
-
-if (quickCorrectionBtn) {
-    quickCorrectionBtn.addEventListener('click', sendQuickCorrection);
-}
-
-// Signature Event Listeners
-if (coordinatorUpload) {
-    coordinatorUpload.addEventListener('change', function(e) {
-        handleSignatureUpload(e, 'coordinator');
-    });
-}
-
-if (principalUpload) {
-    principalUpload.addEventListener('change', function(e) {
-        handleSignatureUpload(e, 'principal');
-    });
-}
-
-if (removeCoordinatorBtn) {
-    removeCoordinatorBtn.addEventListener('click', function() {
-        removeSignature('coordinator');
-    });
-}
-
-if (removePrincipalBtn) {
-    removePrincipalBtn.addEventListener('click', function() {
-        removeSignature('principal');
-    });
-}
-
-// New Data Management Event Listeners
-if (clearAllStudentsBtn) {
-    clearAllStudentsBtn.addEventListener('click', clearAllStudents);
-}
-
-if (clearAllResultsBtn) {
-    clearAllResultsBtn.addEventListener('click', clearAllResults);
-}
-
-if (clearAllQuestionsBtn) {
-    clearAllQuestionsBtn.addEventListener('click', clearAllQuestions);
-}
-
-if (bulkUploadQuestionsBtn) {
-    bulkUploadQuestionsBtn.addEventListener('click', showBulkUploadSection);
-}
-
-if (addSingleQuestionBtn) {
-    addSingleQuestionBtn.addEventListener('click', showSingleQuestionSection);
-}
-
-if (processBulkUploadBtn) {
-    processBulkUploadBtn.addEventListener('click', processBulkUpload);
-}
-
-if (cancelBulkUploadBtn) {
-    cancelBulkUploadBtn.addEventListener('click', hideQuestionSections);
-}
-
-if (saveSingleQuestionBtn) {
-    saveSingleQuestionBtn.addEventListener('click', addSingleQuestion);
-}
-
-if (cancelSingleQuestionBtn) {
-    cancelSingleQuestionBtn.addEventListener('click', hideQuestionSections);
-}
-
-if (viewAutoRegisteredBtn) {
-    viewAutoRegisteredBtn.addEventListener('click', showAutoRegisteredStudents);
-}
-
-// Tab functionality
-tabButtons.forEach(button => {
-    button.addEventListener('click', function() {
-        // Remove active class from all buttons
-        tabButtons.forEach(btn => btn.classList.remove('active'));
-        // Add active class to clicked button
-        this.classList.add('active');
-        
-        // Hide all tab panes
-        document.querySelectorAll('.tab-pane').forEach(pane => {
-            pane.classList.remove('active');
-        });
-        
-        // Show selected tab pane
-        const tabId = this.getAttribute('data-tab');
-        document.getElementById(tabId).classList.add('active');
-        
-        // Load students if students panel is selected
-        if (tabId === 'students-panel') {
-            loadStudents();
-        }
-    });
-});
 
 // ==================== CORE FUNCTIONS ====================
 
 async function initializeApp() {
-    // Ensure only student login is visible on startup
     document.getElementById('student-login').style.display = 'block';
     document.getElementById('class-selection').style.display = 'none';
     document.getElementById('exam-interface').style.display = 'none';
@@ -1198,130 +534,84 @@ async function initializeApp() {
     document.getElementById('admin-dashboard').style.display = 'none';
     document.getElementById('arms-selection').style.display = 'none';
     
-    // Load data from Firebase
     await loadStudentsFromFirebase();
     await loadSignaturesFromFirebase();
     
-    // Focus on student ID input
-    if (studentIdInput) studentIdInput.focus();
+    if (document.getElementById('student-id')) document.getElementById('student-id').focus();
     
-    // Load students if any exist
     if (students.length > 0) {
         loadStudents();
     }
     
-    // Initialize real-time updates
-    setTimeout(() => {
-        initializeRealTimeUpdates();
-        testFirebaseConnection().then(success => {
-            updateRealTimeStatus(success ? 'Connected ✓' : 'Disconnected ✗', success);
-        });
-    }, 2000);
+    updateConnectionStatus();
+}
+
+function updateConnectionStatus() {
+    const statusElement = document.getElementById('connection-status');
+    if (!statusElement) return;
+    
+    if (realTimeEnabled) {
+        statusElement.innerHTML = '<span style="color: green;">🟢 Online (Firebase Connected)</span>';
+    } else {
+        statusElement.innerHTML = '<span style="color: orange;">🟠 Offline (Local Mode)</span>';
+    }
 }
 
 async function studentLoginAction() {
-    const studentId = studentIdInput.value.trim();
-    const studentName = studentNameInput.value.trim();
+    const studentId = document.getElementById('student-id').value.trim();
+    const studentName = document.getElementById('student-name').value.trim();
     
     if (!studentId || !studentName) {
         alert('Please enter both Student ID and Full Name');
         return;
     }
     
-    // Check if student is registered in the system
-    const registeredStudents = students;
-    const existingStudent = registeredStudents.find(s => 
+    const existingStudent = students.find(s => 
         s.id === studentId && s.name.toLowerCase() === studentName.toLowerCase()
     );
     
     if (existingStudent) {
-        // Student exists in system - use their registered data
         currentState.studentId = studentId;
         currentState.studentName = studentName;
         currentState.selectedClass = existingStudent.class;
         currentState.selectedArm = existingStudent.arm;
-        
-        console.log('Registered student logged in:', existingStudent);
     } else {
-        // Student not registered - allow login with manual class selection
         currentState.studentId = studentId;
         currentState.studentName = studentName;
-        currentState.selectedClass = null; // Will be selected manually
-        currentState.selectedArm = null;   // Will be selected manually
+        currentState.selectedClass = null;
+        currentState.selectedArm = null;
         
-        // Add to students array for future reference (without class/arm yet)
-        if (!registeredStudents.some(s => s.id === studentId)) {
+        if (!students.some(s => s.id === studentId)) {
             const newStudent = {
                 id: studentId,
                 name: studentName,
-                class: null, // Will be set when they select class
-                arm: null,   // Will be set when they select arm
+                class: null,
+                arm: null,
                 created: new Date().toISOString(),
-                autoRegistered: true // Flag to identify auto-registered students
+                autoRegistered: true
             };
             students.push(newStudent);
             await saveStudentsToFirebase();
-            console.log('New student auto-registered:', newStudent);
-        }
-        
-        console.log('Unregistered student logged in - manual class selection required');
-    }
-    
-    // Proceed to class selection
-    studentLogin.style.display = 'none';
-    classSelection.style.display = 'block';
-    studentInfo.textContent = `${studentName} (${studentId})`;
-    
-    // Show appropriate message based on registration status
-    if (!existingStudent) {
-        const infoMessage = document.createElement('div');
-        infoMessage.className = 'alert alert-info mt-3';
-        infoMessage.innerHTML = `
-            <strong>New Student:</strong> Please select your class and arm below.
-            ${currentState.selectedClass ? 'Class pre-selected from registration.' : ''}
-        `;
-        
-        // Insert at the beginning of class selection content
-        const classSelectionContent = document.querySelector('#class-selection .container');
-        if (classSelectionContent && !classSelectionContent.querySelector('.alert-info')) {
-            classSelectionContent.insertBefore(infoMessage, classSelectionContent.firstChild);
         }
     }
     
-    // If student has pre-registered class, highlight it
+    document.getElementById('student-login').style.display = 'none';
+    document.getElementById('class-selection').style.display = 'block';
+    document.getElementById('student-info').textContent = `${studentName} (${studentId})`;
+    
     if (currentState.selectedClass) {
         document.querySelectorAll('.class-select').forEach(btn => {
             btn.classList.remove('active');
             if (btn.getAttribute('data-level') === currentState.selectedClass) {
                 btn.classList.add('active');
                 showArmsSelection(currentState.selectedClass);
-                
-                // Auto-select the student's arm if available
-                setTimeout(() => {
-                    if (currentState.selectedArm) {
-                        const armBtn = document.querySelector(`#arms-container button[data-arm="${currentState.selectedArm}"]`);
-                        if (armBtn) {
-                            document.querySelectorAll('#arms-container button').forEach(btn => {
-                                btn.classList.remove('btn-primary');
-                                btn.classList.add('btn-secondary');
-                            });
-                            armBtn.classList.remove('btn-secondary');
-                            armBtn.classList.add('btn-primary');
-                        }
-                    }
-                }, 100);
             }
         });
-    } else {
-        // Clear any active class selections for new students
-        document.querySelectorAll('.class-select').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        if (armsSelection) armsSelection.style.display = 'none';
     }
 }
 
 function showArmsSelection(level) {
+    const armsContainer = document.getElementById('arms-container');
     if (!armsContainer) return;
     
     armsContainer.innerHTML = '';
@@ -1337,34 +627,28 @@ function showArmsSelection(level) {
         armButton.textContent = level + ' ' + arm;
         armButton.setAttribute('data-arm', arm);
         armButton.addEventListener('click', async function() {
-            // Update all buttons
             document.querySelectorAll('#arms-container button').forEach(btn => {
                 btn.classList.remove('btn-primary');
                 btn.classList.add('btn-secondary');
             });
             
-            // Set current button as active
             this.classList.remove('btn-secondary');
             this.classList.add('btn-primary');
             
-            // Set the selected arm
             currentState.selectedArm = this.getAttribute('data-arm');
             
-            // Update student record if this is an auto-registered student
             const student = students.find(s => s.id === currentState.studentId && s.name === currentState.studentName);
             if (student && (student.autoRegistered || !student.arm)) {
                 student.arm = currentState.selectedArm;
                 await saveStudentsToFirebase();
-                console.log('Updated student arm:', student);
             }
         });
         
         armsContainer.appendChild(armButton);
     });
     
-    armsSelection.style.display = 'block';
+    document.getElementById('arms-selection').style.display = 'block';
     
-    // Pre-select arm if student has one from registration
     if (currentState.selectedArm) {
         const armBtn = document.querySelector(`#arms-container button[data-arm="${currentState.selectedArm}"]`);
         if (armBtn) {
@@ -1384,7 +668,6 @@ function startExam() {
         return;
     }
     
-    // Final check and update of student record
     const student = students.find(s => s.id === currentState.studentId && s.name === currentState.studentName);
     if (student && (!student.class || !student.arm)) {
         student.class = currentState.selectedClass;
@@ -1398,12 +681,11 @@ function startExam() {
     currentState.shuffledQuestions = [...questionsDatabase[currentState.selectedClass]];
     shuffleArray(currentState.shuffledQuestions);
     
-    classSelection.style.display = 'none';
-    examInterface.style.display = 'block';
-    examTitle.textContent = `${currentState.selectedClass}${currentState.selectedArm} - Examination`;
-    studentExamInfo.textContent = `Student: ${currentState.studentName} (${currentState.studentId})`;
+    document.getElementById('class-selection').style.display = 'none';
+    document.getElementById('exam-interface').style.display = 'block';
+    document.getElementById('exam-title').textContent = `${currentState.selectedClass}${currentState.selectedArm} - Examination`;
+    document.getElementById('student-exam-info').textContent = `Student: ${currentState.studentName} (${currentState.studentId})`;
     
-    // Show progress bar
     document.getElementById('exam-progress').style.display = 'block';
     
     startTimer();
@@ -1421,6 +703,7 @@ function shuffleArray(array) {
 }
 
 function loadQuestion(index) {
+    const questionsContainer = document.getElementById('questions-container');
     if (!questionsContainer) return;
     
     questionsContainer.innerHTML = '';
@@ -1460,6 +743,7 @@ function loadQuestion(index) {
 }
 
 function createQuestionNavigation() {
+    const questionNav = document.getElementById('question-nav');
     if (!questionNav) return;
     
     questionNav.innerHTML = '';
@@ -1480,6 +764,9 @@ function createQuestionNavigation() {
 }
 
 function updateQuestionNavigation() {
+    const questionNav = document.getElementById('question-nav');
+    if (!questionNav) return;
+    
     const navBtns = questionNav.querySelectorAll('.question-nav-btn');
     navBtns.forEach((btn, index) => {
         btn.classList.remove('active');
@@ -1509,6 +796,8 @@ function updateProgressBar() {
 }
 
 function updateNavigationButtons() {
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
     if (!prevBtn || !nextBtn) return;
     
     prevBtn.disabled = currentState.currentQuestion === 0;
@@ -1540,6 +829,7 @@ function startTimer() {
         const minutes = Math.floor(currentState.examTime / 60);
         const seconds = currentState.examTime % 60;
         
+        const examTimer = document.getElementById('exam-timer');
         if (examTimer) {
             examTimer.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
         }
@@ -1597,19 +887,15 @@ async function submitExam() {
         answers: currentState.userAnswers
     };
     
-    // Save to Firebase
     await saveExamResultToFirebase(result);
-    
-    // Also save to Google Sheets
     saveToGoogleSheets(result);
     
-    examInterface.style.display = 'none';
-    resultsScreen.style.display = 'block';
+    document.getElementById('exam-interface').style.display = 'none';
+    document.getElementById('results-screen').style.display = 'block';
     
-    studentResultInfo.textContent = `${currentState.studentName} - ${currentState.selectedClass}${currentState.selectedArm}`;
-    scoreDisplay.textContent = `${currentTotalMarks}/100`;
+    document.getElementById('student-result-info').textContent = `${currentState.studentName} - ${currentState.selectedClass}${currentState.selectedArm}`;
+    document.getElementById('score-display').textContent = `${currentTotalMarks}/100`;
     
-    // Update certificate elements
     const certStudentName = document.getElementById('cert-student-name');
     const certStudentId = document.getElementById('cert-student-id');
     const certClassInfo = document.getElementById('cert-class-info');
@@ -1632,6 +918,7 @@ async function submitExam() {
     
     updateStudentResultSignatures();
     
+    const resultMessage = document.getElementById('result-message');
     if (resultMessage) {
         if (currentPercentage >= 80) {
             resultMessage.textContent = "Excellent performance! You have a strong understanding of the subject. Your practical marks will be added by your teacher.";
@@ -1698,26 +985,22 @@ function printStudentResult() {
     window.print();
 }
 
-function printAdminResults() {
-    window.print();
-}
-
 function retakeExam() {
-    resultsScreen.style.display = 'none';
-    classSelection.style.display = 'block';
+    document.getElementById('results-screen').style.display = 'none';
+    document.getElementById('class-selection').style.display = 'block';
     currentState.selectedClass = null;
     currentState.selectedArm = null;
-    if (armsSelection) armsSelection.style.display = 'none';
+    document.getElementById('arms-selection').style.display = 'none';
     currentState.examTime = 30 * 60;
 }
 
 function backToMainLogin() {
-    studentLogin.style.display = 'block';
-    if (classSelection) classSelection.style.display = 'none';
-    if (examInterface) examInterface.style.display = 'none';
-    if (resultsScreen) resultsScreen.style.display = 'none';
-    if (adminLogin) adminLogin.style.display = 'none';
-    if (adminDashboard) adminDashboard.style.display = 'none';
+    document.getElementById('student-login').style.display = 'block';
+    document.getElementById('class-selection').style.display = 'none';
+    document.getElementById('exam-interface').style.display = 'none';
+    document.getElementById('results-screen').style.display = 'none';
+    document.getElementById('admin-login').style.display = 'none';
+    document.getElementById('admin-dashboard').style.display = 'none';
     
     currentState = {
         studentId: null,
@@ -1731,13 +1014,15 @@ function backToMainLogin() {
         timerInterval: null
     };
     
-    if (studentIdInput) studentIdInput.value = '';
-    if (studentNameInput) studentNameInput.value = '';
+    document.getElementById('student-id').value = '';
+    document.getElementById('student-name').value = '';
 }
 
+// ==================== ADMIN FUNCTIONS ====================
+
 function showAdminLogin() {
-    studentLogin.style.display = 'none';
-    adminLogin.style.display = 'block';
+    document.getElementById('student-login').style.display = 'none';
+    document.getElementById('admin-login').style.display = 'block';
 }
 
 function adminLoginAction() {
@@ -1745,25 +1030,81 @@ function adminLoginAction() {
     const password = document.getElementById('admin-password').value;
     
     if (username === 'admin' && password === 'admin123') {
-        adminLogin.style.display = 'none';
-        adminDashboard.style.display = 'block';
+        document.getElementById('admin-login').style.display = 'none';
+        document.getElementById('admin-dashboard').style.display = 'block';
+        
+        // Load data
         loadAdminResults();
         loadSignatures();
+        loadStudents();
+        
+        // Initialize admin tabs
+        setTimeout(() => {
+            initializeAdminTabs();
+            initializeSettingsPanel();
+            initializeQuestionsPanel();
+        }, 100);
+        
+        // Add sync button
+        addSyncButtonToAdmin();
+        
+        showRealTimeNotification(`🔧 Admin dashboard loaded - ${realTimeEnabled ? 'Real-time sync active' : 'Offline mode'}`);
     } else {
         alert('Invalid username or password');
     }
 }
 
+function addSyncButtonToAdmin() {
+    const syncButton = document.createElement('button');
+    syncButton.id = 'force-sync-btn';
+    syncButton.className = 'btn btn-warning btn-sm';
+    syncButton.innerHTML = '🔄 Force Sync';
+    syncButton.title = 'Sync all data between devices';
+    syncButton.addEventListener('click', forceSyncAllData);
+    
+    const adminHeader = document.querySelector('#admin-dashboard .container .d-flex');
+    if (adminHeader) {
+        adminHeader.appendChild(syncButton);
+    }
+}
+
+async function forceSyncAllData() {
+    if (!realTimeEnabled) {
+        alert('Firebase not available. Cannot sync.');
+        return;
+    }
+    
+    try {
+        showRealTimeNotification('🔄 Starting full data sync...');
+        
+        await saveStudentsToFirebase();
+        
+        const localResults = JSON.parse(localStorage.getItem('examResults') || '[]');
+        if (localResults.length > 0) {
+            await database.ref('examResults').set(localResults);
+        }
+        
+        await saveSignaturesToFirebase();
+        await database.ref('questions').set(questionsDatabase);
+        
+        showRealTimeNotification('✅ All data synced successfully!');
+    } catch (error) {
+        console.error('Error in force sync:', error);
+        showRealTimeNotification('❌ Sync failed: ' + error.message);
+    }
+}
+
 function adminLogout() {
-    adminDashboard.style.display = 'none';
-    studentLogin.style.display = 'block';
+    document.getElementById('admin-dashboard').style.display = 'none';
+    document.getElementById('student-login').style.display = 'block';
 }
 
 async function loadAdminResults() {
+    const adminResults = document.getElementById('admin-results');
     if (!adminResults) return;
     
-    const selectedClass = classSelectAdmin.value;
-    const selectedArm = armSelectAdmin.value;
+    const selectedClass = document.getElementById('class-select-admin').value;
+    const selectedArm = document.getElementById('arm-select-admin').value;
     
     const sheetsInfo = `
         <div class="alert alert-success mb-4">
@@ -1931,8 +1272,64 @@ function updatePracticalScore(event) {
         return;
     }
     
-    // Use the real-time version
     updatePracticalScoreRealTimeAdmin(studentId, date, practicalScore);
+}
+
+async function updatePracticalScoreRealTimeAdmin(studentId, timestamp, practicalScore) {
+    if (!realTimeEnabled) {
+        updatePracticalScoreLocal(studentId, timestamp, practicalScore);
+        return;
+    }
+    
+    const scoreUpdate = {
+        studentId: studentId,
+        timestamp: timestamp,
+        practicalScore: practicalScore,
+        admin: 'Administrator',
+        updateTime: new Date().toISOString()
+    };
+    
+    updatePracticalScoreLocal(studentId, timestamp, practicalScore);
+    
+    try {
+        await database.ref('admin/corrections').set({
+            updatedScores: [scoreUpdate],
+            timestamp: new Date().toISOString()
+        });
+        console.log('Practical score update sent to all users');
+    } catch (error) {
+        console.error('Error sending score update:', error);
+    }
+}
+
+function updatePracticalScoreLocal(studentId, timestamp, practicalScore) {
+    let results = JSON.parse(localStorage.getItem('examResults') || '[]');
+    const resultIndex = results.findIndex(r => 
+        r.studentId === studentId && r.timestamp === timestamp
+    );
+    
+    if (resultIndex !== -1) {
+        results[resultIndex].practicalScore = practicalScore;
+        
+        const theoryMarks = results[resultIndex].theoryMarks;
+        const totalMarks = theoryMarks + practicalScore;
+        const percentage = (totalMarks / 100) * 100;
+        
+        let grade = '';
+        if (percentage >= 90) grade = 'A+ (Excellent)';
+        else if (percentage >= 80) grade = 'A (Very Good)';
+        else if (percentage >= 70) grade = 'B (Good)';
+        else if (percentage >= 60) grade = 'C (Fair)';
+        else if (percentage >= 50) grade = 'D (Pass)';
+        else grade = 'F (Fail)';
+        
+        results[resultIndex].totalMarks = totalMarks;
+        results[resultIndex].percentage = percentage.toFixed(1);
+        results[resultIndex].grade = grade;
+        
+        localStorage.setItem('examResults', JSON.stringify(results));
+        loadAdminResults();
+    }
 }
 
 function printIndividualResult(event) {
@@ -2133,17 +1530,17 @@ function printIndividualResult(event) {
                 <div class="footer">
                     <div class="signature-line">
                         ${currentSignatures.coordinator ? 
-                            `<img src="${currentSignatures.coordinator}" alt="TECH TUTOR Signature" class="signature-image">` : 
+                            `<img src="${currentSignatures.coordinator}" alt="CEO TECHXAGON ACADEMY Signature" class="signature-image">` : 
                             '<div class="signature-placeholder"></div>'
                         }
-                        <div class="signature-name">TECH TUTOR</div>
+                        <div class="signature-name">CEO TECHXAGON ACADEMY</div>
                     </div>
                     <div class="signature-line">
                         ${currentSignatures.principal ? 
-                            `<img src="${currentSignatures.principal}" alt="VP ACADMICS SNR (DD) Signature" class="signature-image">` : 
+                            `<img src="${currentSignatures.principal}" alt="School Principal Signature" class="signature-image">` : 
                             '<div class="signature-placeholder"></div>'
                         }
-                        <div class="signature-name">VP ACADMICS SNR (DD)</div>
+                        <div class="signature-name">School Principal</div>
                     </div>
                 </div>
             </div>
@@ -2162,9 +1559,13 @@ function printIndividualResult(event) {
     printWindow.document.close();
 }
 
+function printAdminResults() {
+    window.print();
+}
+
 function exportToExcel() {
-    const selectedClass = classSelectAdmin.value;
-    const selectedArm = armSelectAdmin.value;
+    const selectedClass = document.getElementById('class-select-admin').value;
+    const selectedArm = document.getElementById('arm-select-admin').value;
     
     if (!selectedClass) {
         alert('Please select a class first');
@@ -2204,12 +1605,15 @@ function exportToExcel() {
     document.body.removeChild(a);
 }
 
+// ==================== STUDENT MANAGEMENT ====================
+
 function loadStudents() {
+    const studentsList = document.getElementById('students-list');
     if (!studentsList) return;
     
-    const filterClassValue = filterClass.value;
-    const filterArmValue = filterArm.value;
-    const searchValue = searchStudent.value.toLowerCase();
+    const filterClassValue = document.getElementById('filter-class').value;
+    const filterArmValue = document.getElementById('filter-arm').value;
+    const searchValue = document.getElementById('search-student').value.toLowerCase();
     
     let filteredStudents = students;
     
@@ -2257,6 +1661,51 @@ function loadStudents() {
     });
 }
 
+async function deleteStudentRealTime(studentId) {
+    if (confirm('Are you sure you want to delete this student?')) {
+        students = students.filter(student => student.id !== studentId);
+        await saveStudentsToFirebase();
+        loadStudents();
+        showRealTimeNotification(`🗑️ Student deleted: ${studentId}`);
+    }
+}
+
+async function addStudentRealTime() {
+    const studentId = document.getElementById('new-student-id').value.trim();
+    const studentName = document.getElementById('new-student-name').value.trim();
+    const studentClass = document.getElementById('new-student-class').value;
+    const studentArm = document.getElementById('new-student-arm').value;
+    
+    if (!studentId || !studentName || !studentClass || !studentArm) {
+        alert('Please fill all required fields');
+        return;
+    }
+    
+    if (students.some(student => student.id === studentId)) {
+        alert('Student ID already exists');
+        return;
+    }
+    
+    const newStudent = {
+        id: studentId,
+        name: studentName,
+        class: studentClass,
+        arm: studentArm,
+        created: new Date().toISOString()
+    };
+    
+    students.push(newStudent);
+    await saveStudentsToFirebase();
+    
+    document.getElementById('new-student-id').value = '';
+    document.getElementById('new-student-name').value = '';
+    document.getElementById('new-student-class').value = '';
+    document.getElementById('new-student-arm').value = '';
+    
+    loadStudents();
+    showRealTimeNotification(`👨‍🎓 Student added: ${studentName}`);
+}
+
 function exportStudentsToExcel() {
     if (students.length === 0) {
         alert('No students to export');
@@ -2279,92 +1728,14 @@ function exportStudentsToExcel() {
     document.body.removeChild(a);
 }
 
-function importStudentsFromFile() {
-    const file = importFile.files[0];
-    if (!file) {
-        alert('Please select a file to import');
-        return;
-    }
-    
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        try {
-            const csvData = e.target.result;
-            const rows = csvData.split('\n');
-            const importedStudents = [];
-            
-            for (let i = 1; i < rows.length; i++) {
-                const row = rows[i].trim();
-                if (!row) continue;
-                
-                const columns = row.split(',');
-                if (columns.length >= 4) {
-                    const studentId = columns[0].trim().replace(/"/g, '');
-                    const studentName = columns[1].trim().replace(/"/g, '');
-                    const studentClass = columns[2].trim().replace(/"/g, '');
-                    const studentArm = columns[3].trim().replace(/"/g, '');
-                    
-                    if (studentId && studentName && studentClass && studentArm) {
-                        if (!students.some(s => s.id === studentId)) {
-                            importedStudents.push({
-                                id: studentId,
-                                name: studentName,
-                                class: studentClass,
-                                arm: studentArm
-                            });
-                        }
-                    }
-                }
-            }
-            
-            if (importedStudents.length === 0) {
-                alert('No valid student data found in the file or all students already exist');
-                return;
-            }
-            
-            showImportPreview(importedStudents);
-            
-            if (confirm(`Found ${importedStudents.length} new students. Do you want to import them?`)) {
-                students.push(...importedStudents);
-                saveStudentsToFirebase();
-                loadStudents();
-                alert(`Successfully imported ${importedStudents.length} students`);
-                
-                importFile.value = '';
-                if (importPreview) importPreview.style.display = 'none';
-            }
-        } catch (error) {
-            alert('Error reading file: ' + error.message);
-        }
-    };
-    
-    reader.onerror = function() {
-        alert('Error reading file');
-    };
-    
-    reader.readAsText(file);
-}
-
-function showImportPreview(importedStudents) {
-    if (!importPreview) return;
-    
-    let previewHtml = '<table class="table table-striped"><thead><tr><th>Student ID</th><th>Full Name</th><th>Class</th><th>Arm</th></tr></thead><tbody>';
-    
-    importedStudents.forEach(student => {
-        previewHtml += `<tr><td>${student.id}</td><td>${student.name}</td><td>${student.class}</td><td>${student.arm}</td></tr>`;
-    });
-    
-    previewHtml += '</tbody></table>';
-    importPreview.innerHTML = previewHtml;
-    importPreview.style.display = 'block';
-}
-
 // ==================== SIGNATURE MANAGEMENT ====================
 
-// Signature Management Functions
 async function loadSignatures() {
     const saved = await loadSignaturesFromFirebase();
     signatureData = { ...signatureData, ...saved };
+    
+    const coordinatorPreview = document.getElementById('coordinator-preview');
+    const principalPreview = document.getElementById('principal-preview');
     
     if (signatureData.coordinator && coordinatorPreview) {
         coordinatorPreview.src = signatureData.coordinator;
@@ -2388,8 +1759,6 @@ async function handleSignatureUpload(event, type) {
     const reader = new FileReader();
     reader.onload = async function(e) {
         signatureData[type] = e.target.result;
-        
-        // Save to Firebase
         await saveSignaturesToFirebase();
         
         const preview = document.getElementById(`${type}-preview`);
@@ -2406,8 +1775,6 @@ async function handleSignatureUpload(event, type) {
 
 async function removeSignature(type) {
     delete signatureData[type];
-    
-    // Save to Firebase
     await saveSignaturesToFirebase();
     
     const preview = document.getElementById(`${type}-preview`);
@@ -2454,66 +1821,402 @@ function updateStudentResultSignatures() {
     }
 }
 
-// ==================== REAL-TIME CONTROLS ====================
+// ==================== ADMIN PANEL TAB SYSTEM ====================
 
-// Admin real-time controls
-function sendBroadcastMessage() {
-    const messageInput = document.getElementById('broadcast-message');
-    if (!messageInput) return;
+function initializeAdminTabs() {
+    console.log('Initializing admin tabs...');
     
-    const message = messageInput.value;
-    if (!message) {
-        alert('Please enter a message');
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabPanes = document.querySelectorAll('.tab-pane');
+    
+    if (tabButtons.length === 0) {
+        console.warn('No tab buttons found - admin tabs may not work properly');
         return;
     }
     
-    sendAdminCorrection(message);
-    messageInput.value = '';
+    tabButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            console.log('Tab clicked:', this.getAttribute('data-tab'));
+            
+            tabButtons.forEach(btn => {
+                btn.classList.remove('active');
+                btn.classList.remove('btn-primary');
+                btn.classList.add('btn-secondary');
+            });
+            
+            this.classList.add('active');
+            this.classList.remove('btn-secondary');
+            this.classList.add('btn-primary');
+            
+            tabPanes.forEach(pane => {
+                pane.classList.remove('active');
+                pane.style.display = 'none';
+            });
+            
+            const tabId = this.getAttribute('data-tab');
+            const targetPane = document.getElementById(tabId);
+            
+            if (targetPane) {
+                targetPane.classList.add('active');
+                targetPane.style.display = 'block';
+                console.log('Showing tab:', tabId);
+                
+                switch(tabId) {
+                    case 'students-panel':
+                        loadStudents();
+                        break;
+                    case 'results-panel':
+                        loadAdminResults();
+                        break;
+                    case 'signatures-panel':
+                        loadSignatures();
+                        break;
+                    case 'questions-panel':
+                        initializeQuestionsPanel();
+                        break;
+                    case 'settings-panel':
+                        initializeSettingsPanel();
+                        break;
+                }
+            } else {
+                console.error('Tab pane not found:', tabId);
+            }
+        });
+    });
+    
+    if (tabButtons.length > 0) {
+        tabButtons[0].click();
+    }
 }
 
-function sendQuickCorrection() {
-    const className = document.getElementById('rt-class').value;
-    const questionIndex = parseInt(document.getElementById('rt-question-index').value) - 1;
-    const correctionText = document.getElementById('rt-correction-text').value;
+function initializeQuestionsPanel() {
+    console.log('Initializing questions panel...');
     
-    if (!className || isNaN(questionIndex) || !correctionText) {
-        alert('Please fill all fields');
-        return;
+    const clearAllQuestionsBtn = document.getElementById('clear-all-questions');
+    const bulkUploadQuestionsBtn = document.getElementById('bulk-upload-questions');
+    const addSingleQuestionBtn = document.getElementById('add-single-question');
+    const viewAutoRegisteredBtn = document.getElementById('view-auto-registered');
+    
+    if (clearAllQuestionsBtn) {
+        clearAllQuestionsBtn.addEventListener('click', clearAllQuestions);
     }
     
-    if (questionIndex < 0 || questionIndex > 29) {
-        alert('Question number must be between 1 and 30');
-        return;
+    if (bulkUploadQuestionsBtn) {
+        bulkUploadQuestionsBtn.addEventListener('click', showBulkUploadSection);
     }
     
-    updateQuestionRealTime(className, questionIndex, 'question', correctionText);
+    if (addSingleQuestionBtn) {
+        addSingleQuestionBtn.addEventListener('click', showSingleQuestionSection);
+    }
     
-    // Clear fields
-    document.getElementById('rt-question-index').value = '';
-    document.getElementById('rt-correction-text').value = '';
+    if (viewAutoRegisteredBtn) {
+        viewAutoRegisteredBtn.addEventListener('click', showAutoRegisteredStudents);
+    }
+    
+    initializeQuestionManagement();
 }
 
-// Update status display
-function updateRealTimeStatus(status, isConnected) {
-    const statusElement = document.getElementById('real-time-status-text');
-    const liveStatus = document.getElementById('live-status');
+function initializeSettingsPanel() {
+    console.log('Initializing settings panel...');
     
-    if (statusElement) {
-        statusElement.textContent = status;
-        statusElement.className = isConnected ? 'text-success' : 'text-danger';
+    const backupDataBtn = document.getElementById('backup-data-btn');
+    const restoreDataBtn = document.getElementById('restore-data-btn');
+    const testFirebaseBtn = document.getElementById('test-firebase-btn');
+    const clearAllStudentsBtn = document.getElementById('clear-all-students');
+    const clearAllResultsBtn = document.getElementById('clear-all-results');
+    
+    if (backupDataBtn) {
+        backupDataBtn.addEventListener('click', backupData);
     }
     
-    if (liveStatus) {
-        liveStatus.textContent = status;
-        if (isConnected) {
-            liveStatus.classList.add('connected');
-        } else {
-            liveStatus.classList.remove('connected');
+    if (restoreDataBtn) {
+        restoreDataBtn.addEventListener('click', function() {
+            document.getElementById('restore-file').click();
+        });
+        
+        const restoreFile = document.getElementById('restore-file');
+        if (restoreFile) {
+            restoreFile.addEventListener('change', restoreDataFromFile);
         }
     }
+    
+    if (testFirebaseBtn) {
+        testFirebaseBtn.addEventListener('click', testFirebaseConnection);
+    }
+    
+    if (clearAllStudentsBtn) {
+        clearAllStudentsBtn.addEventListener('click', clearAllStudents);
+    }
+    
+    if (clearAllResultsBtn) {
+        clearAllResultsBtn.addEventListener('click', clearAllResults);
+    }
 }
 
-// ==================== BACKUP AND RECOVERY ====================
+function initializeQuestionManagement() {
+    console.log('Initializing question management...');
+    
+    const processBulkUploadBtn = document.getElementById('process-bulk-upload');
+    const cancelBulkUploadBtn = document.getElementById('cancel-bulk-upload');
+    
+    if (processBulkUploadBtn) {
+        processBulkUploadBtn.addEventListener('click', processBulkUpload);
+    }
+    
+    if (cancelBulkUploadBtn) {
+        cancelBulkUploadBtn.addEventListener('click', hideQuestionSections);
+    }
+    
+    const saveSingleQuestionBtn = document.getElementById('save-single-question');
+    const cancelSingleQuestionBtn = document.getElementById('cancel-single-question');
+    
+    if (saveSingleQuestionBtn) {
+        saveSingleQuestionBtn.addEventListener('click', addSingleQuestion);
+    }
+    
+    if (cancelSingleQuestionBtn) {
+        cancelSingleQuestionBtn.addEventListener('click', hideQuestionSections);
+    }
+}
+
+// ==================== QUESTION MANAGEMENT FUNCTIONS ====================
+
+function showBulkUploadSection() {
+    const bulkSection = document.getElementById('bulk-upload-section');
+    const singleSection = document.getElementById('single-question-section');
+    
+    if (bulkSection) bulkSection.style.display = 'block';
+    if (singleSection) singleSection.style.display = 'none';
+}
+
+function showSingleQuestionSection() {
+    const bulkSection = document.getElementById('bulk-upload-section');
+    const singleSection = document.getElementById('single-question-section');
+    
+    if (bulkSection) bulkSection.style.display = 'none';
+    if (singleSection) singleSection.style.display = 'block';
+}
+
+function hideQuestionSections() {
+    const bulkSection = document.getElementById('bulk-upload-section');
+    const singleSection = document.getElementById('single-question-section');
+    
+    if (bulkSection) bulkSection.style.display = 'none';
+    if (singleSection) singleSection.style.display = 'none';
+}
+
+async function processBulkUpload() {
+    const fileInput = document.getElementById('questions-json-file');
+    const className = document.getElementById('bulk-upload-class').value;
+    
+    if (!className) {
+        alert('Please select a class');
+        return;
+    }
+    
+    if (!fileInput.files.length) {
+        alert('Please select a JSON file');
+        return;
+    }
+    
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+    
+    reader.onload = async function(e) {
+        try {
+            const questionsData = JSON.parse(e.target.result);
+            
+            if (!Array.isArray(questionsData)) {
+                throw new Error('Invalid format: JSON should be an array of questions');
+            }
+            
+            for (let i = 0; i < questionsData.length; i++) {
+                const question = questionsData[i];
+                if (!question.question || !Array.isArray(question.options) || 
+                    question.options.length !== 4 || typeof question.correct !== 'number') {
+                    throw new Error(`Invalid question format at index ${i}`);
+                }
+            }
+            
+            if (!questionsDatabase[className]) {
+                questionsDatabase[className] = [];
+            }
+            
+            questionsDatabase[className].push(...questionsData);
+            
+            if (realTimeEnabled) {
+                await database.ref('questions').set(questionsDatabase);
+            }
+            
+            localStorage.setItem('questionsDatabase', JSON.stringify(questionsDatabase));
+            
+            fileInput.value = '';
+            document.getElementById('bulk-upload-class').value = '';
+            
+            hideQuestionSections();
+            
+            showRealTimeNotification(`✅ ${questionsData.length} questions uploaded successfully for ${className}`);
+            alert(`Successfully uploaded ${questionsData.length} questions for ${className}`);
+            
+        } catch (error) {
+            console.error('Error processing bulk upload:', error);
+            alert('Error processing file: ' + error.message + '\n\nPlease check the JSON format.');
+        }
+    };
+    
+    reader.onerror = function() {
+        alert('Error reading file');
+    };
+    
+    reader.readAsText(file);
+}
+
+async function addSingleQuestion() {
+    const className = document.getElementById('single-question-class').value;
+    const questionText = document.getElementById('single-question-text').value.trim();
+    const optionA = document.getElementById('option-a').value.trim();
+    const optionB = document.getElementById('option-b').value.trim();
+    const optionC = document.getElementById('option-c').value.trim();
+    const optionD = document.getElementById('option-d').value.trim();
+    const correctAnswer = parseInt(document.getElementById('correct-answer').value);
+    
+    if (!className) {
+        alert('Please select a class');
+        return;
+    }
+    
+    if (!questionText) {
+        alert('Please enter question text');
+        return;
+    }
+    
+    if (!optionA || !optionB || !optionC || !optionD) {
+        alert('Please fill in all four options');
+        return;
+    }
+    
+    const newQuestion = {
+        question: questionText,
+        options: [optionA, optionB, optionC, optionD],
+        correct: correctAnswer
+    };
+    
+    try {
+        if (!questionsDatabase[className]) {
+            questionsDatabase[className] = [];
+        }
+        
+        questionsDatabase[className].push(newQuestion);
+        
+        if (realTimeEnabled) {
+            await database.ref('questions').set(questionsDatabase);
+        }
+        
+        localStorage.setItem('questionsDatabase', JSON.stringify(questionsDatabase));
+        
+        document.getElementById('single-question-class').value = '';
+        document.getElementById('single-question-text').value = '';
+        document.getElementById('option-a').value = '';
+        document.getElementById('option-b').value = '';
+        document.getElementById('option-c').value = '';
+        document.getElementById('option-d').value = '';
+        document.getElementById('correct-answer').value = '0';
+        
+        hideQuestionSections();
+        
+        showRealTimeNotification(`✅ Question added successfully to ${className}`);
+        alert('Question added successfully!');
+        
+    } catch (error) {
+        console.error('Error adding question:', error);
+        alert('Error adding question: ' + error.message);
+    }
+}
+
+// ==================== DATA MANAGEMENT FUNCTIONS ====================
+
+async function clearAllStudents() {
+    if (!confirm('⚠️ WARNING: This will permanently delete ALL student records. This action cannot be undone!\n\nAre you sure you want to continue?')) {
+        return;
+    }
+    
+    if (!confirm('❌ FINAL WARNING: This will delete ALL student data including registration information. Please confirm again.')) {
+        return;
+    }
+    
+    try {
+        students = [];
+        
+        if (realTimeEnabled) {
+            await database.ref('students').remove();
+        }
+        
+        localStorage.removeItem('students');
+        
+        loadStudents();
+        
+        showRealTimeNotification('✅ All students data has been cleared successfully');
+        console.log('All students data cleared');
+    } catch (error) {
+        console.error('Error clearing students data:', error);
+        alert('Error clearing students data: ' + error.message);
+    }
+}
+
+async function clearAllResults() {
+    if (!confirm('⚠️ WARNING: This will permanently delete ALL exam results. This action cannot be undone!\n\nAre you sure you want to continue?')) {
+        return;
+    }
+    
+    if (!confirm('❌ FINAL WARNING: This will delete ALL examination results. Please confirm again.')) {
+        return;
+    }
+    
+    try {
+        if (realTimeEnabled) {
+            await database.ref('examResults').remove();
+        }
+        
+        localStorage.removeItem('examResults');
+        
+        loadAdminResults();
+        
+        showRealTimeNotification('✅ All exam results have been cleared successfully');
+        console.log('All exam results cleared');
+    } catch (error) {
+        console.error('Error clearing exam results:', error);
+        alert('Error clearing exam results: ' + error.message);
+    }
+}
+
+async function clearAllQuestions() {
+    const className = prompt('Enter the class to clear questions for (JSS1, JSS2, JSS3, SS1, SS2, SS3):');
+    
+    if (!className || !questionsDatabase[className]) {
+        alert('Invalid class name or class does not exist');
+        return;
+    }
+    
+    if (!confirm(`⚠️ WARNING: This will permanently delete ALL questions for ${className}. This action cannot be undone!\n\nAre you sure you want to continue?`)) {
+        return;
+    }
+    
+    try {
+        questionsDatabase[className] = [];
+        
+        if (realTimeEnabled) {
+            await database.ref('questions').set(questionsDatabase);
+        }
+        
+        localStorage.setItem('questionsDatabase', JSON.stringify(questionsDatabase));
+        
+        showRealTimeNotification(`✅ All questions for ${className} have been cleared successfully`);
+        console.log(`All questions cleared for ${className}`);
+    } catch (error) {
+        console.error('Error clearing questions:', error);
+        alert('Error clearing questions: ' + error.message);
+    }
+}
 
 function backupData() {
     const backup = {
@@ -2556,6 +2259,12 @@ function restoreDataFromFile() {
             if (backup.results) {
                 localStorage.setItem('examResults', JSON.stringify(backup.results));
             }
+            if (backup.questions) {
+                Object.keys(backup.questions).forEach(className => {
+                    questionsDatabase[className] = backup.questions[className];
+                });
+                localStorage.setItem('questionsDatabase', JSON.stringify(questionsDatabase));
+            }
             if (backup.signatures) {
                 localStorage.setItem('signatureData', JSON.stringify(backup.signatures));
                 loadSignatures();
@@ -2570,321 +2279,6 @@ function restoreDataFromFile() {
     reader.readAsText(file);
 }
 
-// ==================== SESSION MANAGEMENT ====================
-
-let sessionTimeout;
-
-function resetSessionTimer() {
-    clearTimeout(sessionTimeout);
-    sessionTimeout = setTimeout(() => {
-        if (confirm('Session expired. Would you like to continue?')) {
-            resetSessionTimer();
-        } else {
-            backToMainLogin();
-        }
-    }, 30 * 60 * 1000); // 30 minutes
-}
-
-// Add to event listeners
-document.addEventListener('click', resetSessionTimer);
-document.addEventListener('keypress', resetSessionTimer);
-
-// ==================== FIREBASE TEST FUNCTION ====================
-
-// Test your Firebase connection
-async function testYourFirebaseConnection() {
-    if (!database) {
-        console.error('Database not initialized');
-        return;
-    }
-    
-    try {
-        await database.ref('connectionTest').set({
-            message: 'CBT System Connected Successfully!',
-            timestamp: new Date().toISOString(),
-            studentName: 'Test User',
-            status: 'Active'
-        });
-        console.log('✅ Test data written successfully');
-        showRealTimeNotification('Firebase Realtime Database is working!');
-        
-        // Read back the data to confirm
-        const snapshot = await database.ref('connectionTest').once('value');
-        const data = snapshot.val();
-        console.log('✅ Data retrieved:', data);
-        
-        // Update status display
-        updateRealTimeStatus('Connected ✓ - Real-time Active', true);
-    } catch (error) {
-        console.error('❌ Firebase test failed:', error);
-        updateRealTimeStatus('Connection Failed ✗', false);
-        alert('Firebase error: ' + error.message);
-    }
-}
-
-// ==================== CLEAR DATA FUNCTIONS ====================
-
-// Clear all students data
-async function clearAllStudents() {
-    if (!confirm('⚠️ WARNING: This will permanently delete ALL student records. This action cannot be undone!\n\nAre you sure you want to continue?')) {
-        return;
-    }
-    
-    if (!confirm('❌ FINAL WARNING: This will delete ALL student data including registration information. Please confirm again.')) {
-        return;
-    }
-    
-    try {
-        students = [];
-        
-        // Clear from Firebase
-        if (realTimeEnabled) {
-            await database.ref('students').remove();
-        }
-        
-        // Clear from localStorage
-        localStorage.removeItem('students');
-        
-        // Refresh the students list
-        loadStudents();
-        
-        showRealTimeNotification('✅ All students data has been cleared successfully');
-        console.log('All students data cleared');
-    } catch (error) {
-        console.error('Error clearing students data:', error);
-        alert('Error clearing students data: ' + error.message);
-    }
-}
-
-// Clear all exam results
-async function clearAllResults() {
-    if (!confirm('⚠️ WARNING: This will permanently delete ALL exam results. This action cannot be undone!\n\nAre you sure you want to continue?')) {
-        return;
-    }
-    
-    if (!confirm('❌ FINAL WARNING: This will delete ALL examination results. Please confirm again.')) {
-        return;
-    }
-    
-    try {
-        // Clear from Firebase
-        if (realTimeEnabled) {
-            await database.ref('examResults').remove();
-        }
-        
-        // Clear from localStorage
-        localStorage.removeItem('examResults');
-        
-        // Refresh the results view
-        loadAdminResults();
-        
-        showRealTimeNotification('✅ All exam results have been cleared successfully');
-        console.log('All exam results cleared');
-    } catch (error) {
-        console.error('Error clearing exam results:', error);
-        alert('Error clearing exam results: ' + error.message);
-    }
-}
-
-// Clear all questions for a specific class
-async function clearAllQuestions() {
-    const className = prompt('Enter the class to clear questions for (JSS1, JSS2, JSS3, SS1, SS2, SS3):');
-    
-    if (!className || !questionsDatabase[className]) {
-        alert('Invalid class name or class does not exist');
-        return;
-    }
-    
-    if (!confirm(`⚠️ WARNING: This will permanently delete ALL questions for ${className}. This action cannot be undone!\n\nAre you sure you want to continue?`)) {
-        return;
-    }
-    
-    try {
-        // Clear questions for the specified class
-        questionsDatabase[className] = [];
-        
-        // Update Firebase
-        if (realTimeEnabled) {
-            await database.ref('questions').set(questionsDatabase);
-        }
-        
-        // Update localStorage
-        localStorage.setItem('questionsDatabase', JSON.stringify(questionsDatabase));
-        
-        showRealTimeNotification(`✅ All questions for ${className} have been cleared successfully`);
-        console.log(`All questions cleared for ${className}`);
-    } catch (error) {
-        console.error('Error clearing questions:', error);
-        alert('Error clearing questions: ' + error.message);
-    }
-}
-
-// ==================== QUESTIONS MANAGEMENT FUNCTIONS ====================
-
-// Show bulk upload section
-function showBulkUploadSection() {
-    document.getElementById('bulk-upload-section').style.display = 'block';
-    document.getElementById('single-question-section').style.display = 'none';
-}
-
-// Show single question section
-function showSingleQuestionSection() {
-    document.getElementById('single-question-section').style.display = 'block';
-    document.getElementById('bulk-upload-section').style.display = 'none';
-}
-
-// Hide both question sections
-function hideQuestionSections() {
-    document.getElementById('bulk-upload-section').style.display = 'none';
-    document.getElementById('single-question-section').style.display = 'none';
-}
-
-// Process bulk upload of questions
-async function processBulkUpload() {
-    const fileInput = document.getElementById('questions-json-file');
-    const className = document.getElementById('bulk-upload-class').value;
-    
-    if (!className) {
-        alert('Please select a class');
-        return;
-    }
-    
-    if (!fileInput.files.length) {
-        alert('Please select a JSON file');
-        return;
-    }
-    
-    const file = fileInput.files[0];
-    const reader = new FileReader();
-    
-    reader.onload = async function(e) {
-        try {
-            const questionsData = JSON.parse(e.target.result);
-            
-            // Validate the questions data structure
-            if (!Array.isArray(questionsData)) {
-                throw new Error('Invalid format: JSON should be an array of questions');
-            }
-            
-            // Validate each question
-            for (let i = 0; i < questionsData.length; i++) {
-                const question = questionsData[i];
-                if (!question.question || !Array.isArray(question.options) || 
-                    question.options.length !== 4 || typeof question.correct !== 'number') {
-                    throw new Error(`Invalid question format at index ${i}`);
-                }
-            }
-            
-            // Add questions to the database
-            if (!questionsDatabase[className]) {
-                questionsDatabase[className] = [];
-            }
-            
-            questionsDatabase[className].push(...questionsData);
-            
-            // Update Firebase
-            if (realTimeEnabled) {
-                await database.ref('questions').set(questionsDatabase);
-            }
-            
-            // Update localStorage
-            localStorage.setItem('questionsDatabase', JSON.stringify(questionsDatabase));
-            
-            // Clear form
-            fileInput.value = '';
-            document.getElementById('bulk-upload-class').value = '';
-            
-            hideQuestionSections();
-            
-            showRealTimeNotification(`✅ ${questionsData.length} questions uploaded successfully for ${className}`);
-            alert(`Successfully uploaded ${questionsData.length} questions for ${className}`);
-            
-        } catch (error) {
-            console.error('Error processing bulk upload:', error);
-            alert('Error processing file: ' + error.message + '\n\nPlease check the JSON format.');
-        }
-    };
-    
-    reader.onerror = function() {
-        alert('Error reading file');
-    };
-    
-    reader.readAsText(file);
-}
-
-// Add single question
-async function addSingleQuestion() {
-    const className = document.getElementById('single-question-class').value;
-    const questionText = document.getElementById('single-question-text').value.trim();
-    const optionA = document.getElementById('option-a').value.trim();
-    const optionB = document.getElementById('option-b').value.trim();
-    const optionC = document.getElementById('option-c').value.trim();
-    const optionD = document.getElementById('option-d').value.trim();
-    const correctAnswer = parseInt(document.getElementById('correct-answer').value);
-    
-    // Validation
-    if (!className) {
-        alert('Please select a class');
-        return;
-    }
-    
-    if (!questionText) {
-        alert('Please enter question text');
-        return;
-    }
-    
-    if (!optionA || !optionB || !optionC || !optionD) {
-        alert('Please fill in all four options');
-        return;
-    }
-    
-    // Create question object
-    const newQuestion = {
-        question: questionText,
-        options: [optionA, optionB, optionC, optionD],
-        correct: correctAnswer
-    };
-    
-    try {
-        // Initialize class array if it doesn't exist
-        if (!questionsDatabase[className]) {
-            questionsDatabase[className] = [];
-        }
-        
-        // Add the question
-        questionsDatabase[className].push(newQuestion);
-        
-        // Update Firebase
-        if (realTimeEnabled) {
-            await database.ref('questions').set(questionsDatabase);
-        }
-        
-        // Update localStorage
-        localStorage.setItem('questionsDatabase', JSON.stringify(questionsDatabase));
-        
-        // Clear form
-        document.getElementById('single-question-class').value = '';
-        document.getElementById('single-question-text').value = '';
-        document.getElementById('option-a').value = '';
-        document.getElementById('option-b').value = '';
-        document.getElementById('option-c').value = '';
-        document.getElementById('option-d').value = '';
-        document.getElementById('correct-answer').value = '0';
-        
-        hideQuestionSections();
-        
-        showRealTimeNotification(`✅ Question added successfully to ${className}`);
-        alert('Question added successfully!');
-        
-    } catch (error) {
-        console.error('Error adding question:', error);
-        alert('Error adding question: ' + error.message);
-    }
-}
-
-// ==================== AUTO-REGISTERED STUDENTS MANAGEMENT ====================
-
-// Function to view and manage auto-registered students
 function showAutoRegisteredStudents() {
     const autoRegistered = students.filter(s => s.autoRegistered);
     
@@ -2936,23 +2330,24 @@ function showAutoRegisteredStudents() {
     
     html += `</tbody></table></div>`;
     
-    // Show in a modal or in the admin results area
-    adminResults.innerHTML = html;
-    
-    // Add event listeners
-    document.querySelectorAll('.convert-student-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const studentId = this.getAttribute('data-id');
-            convertAutoRegisteredStudent(studentId);
+    const adminResults = document.getElementById('admin-results');
+    if (adminResults) {
+        adminResults.innerHTML = html;
+        
+        document.querySelectorAll('.convert-student-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const studentId = this.getAttribute('data-id');
+                convertAutoRegisteredStudent(studentId);
+            });
         });
-    });
-    
-    document.querySelectorAll('.delete-auto-student-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const studentId = this.getAttribute('data-id');
-            deleteAutoRegisteredStudent(studentId);
+        
+        document.querySelectorAll('.delete-auto-student-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const studentId = this.getAttribute('data-id');
+                deleteAutoRegisteredStudent(studentId);
+            });
         });
-    });
+    }
 }
 
 async function convertAutoRegisteredStudent(studentId) {
@@ -2978,61 +2373,225 @@ async function deleteAutoRegisteredStudent(studentId) {
     showRealTimeNotification(`🗑️ Auto-registered student ${studentId} deleted`);
 }
 
-// Enhanced student statistics
-function showStudentStatistics() {
-    const totalStudents = students.length;
-    const registeredStudents = students.filter(s => !s.autoRegistered).length;
-    const autoRegistered = students.filter(s => s.autoRegistered).length;
-    const studentsWithClass = students.filter(s => s.class && s.arm).length;
+// ==================== FIREBASE TEST FUNCTION ====================
+
+async function testFirebaseConnection() {
+    if (!realTimeEnabled) {
+        alert('Firebase not initialized - running in offline mode');
+        return false;
+    }
     
-    const statsHtml = `
-        <div class="row mb-4">
-            <div class="col-md-3">
-                <div class="card text-white bg-primary">
-                    <div class="card-body">
-                        <h5 class="card-title">Total Students</h5>
-                        <h2 class="card-text">${totalStudents}</h2>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card text-white bg-success">
-                    <div class="card-body">
-                        <h5 class="card-title">Pre-registered</h5>
-                        <h2 class="card-text">${registeredStudents}</h2>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card text-white bg-info">
-                    <div class="card-body">
-                        <h5 class="card-title">Auto-registered</h5>
-                        <h2 class="card-text">${autoRegistered}</h2>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card text-white bg-warning">
-                    <div class="card-body">
-                        <h5 class="card-title">With Class/Arm</h5>
-                        <h2 class="card-text">${studentsWithClass}</h2>
-                    </div>
-                </div>
-            </div>
-        </div>
+    try {
+        const testRef = database.ref('connectionTest');
+        const testData = {
+            timestamp: new Date().toISOString(),
+            message: 'CBT System Connection Test',
+            status: 'success'
+        };
+        
+        await testRef.set(testData);
+        
+        const snapshot = await testRef.once('value');
+        const retrievedData = snapshot.val();
+        
+        if (retrievedData && retrievedData.message === testData.message) {
+            console.log('✅ Firebase connection test: SUCCESS');
+            showRealTimeNotification('🔥 Firebase connected - real-time updates active');
+            updateConnectionStatus();
+            return true;
+        } else {
+            throw new Error('Data verification failed');
+        }
+    } catch (error) {
+        console.error('❌ Firebase connection test: FAILED', error);
+        showRealTimeNotification('❌ Firebase connection failed - using offline mode');
+        return false;
+    }
+}
+
+// ==================== NOTIFICATION SYSTEM ====================
+
+function showRealTimeNotification(message) {
+    let notificationContainer = document.getElementById('real-time-notification-container');
+    if (!notificationContainer) {
+        notificationContainer = document.createElement('div');
+        notificationContainer.id = 'real-time-notification-container';
+        notificationContainer.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10000;
+            max-width: 400px;
+        `;
+        document.body.appendChild(notificationContainer);
+    }
+    
+    const notification = document.createElement('div');
+    notification.className = 'real-time-notification';
+    notification.style.cssText = `
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 15px 20px;
+        margin-bottom: 10px;
+        border-radius: 10px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        animation: slideInRight 0.3s ease-out;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-width: 300px;
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+        cursor: pointer;
     `;
     
-    // You can display this in your admin panel where appropriate
-    console.log('Student Statistics:', {
-        totalStudents,
-        registeredStudents,
-        autoRegistered,
-        studentsWithClass
+    notification.innerHTML = `
+        <div style="flex: 1;">
+            <div style="font-weight: bold; margin-bottom: 5px;">
+                ${realTimeEnabled ? '🔔 Real-time Update' : '⚠️ Offline Mode'}
+            </div>
+            <div>${message}</div>
+            <div style="font-size: 11px; opacity: 0.8; margin-top: 5px;">
+                ${new Date().toLocaleTimeString()}
+            </div>
+        </div>
+        <button onclick="this.parentElement.remove()" 
+                style="background: none; border: none; color: white; cursor: pointer; margin-left: 15px; font-size: 18px;">
+            ✕
+        </button>
+    `;
+    
+    notificationContainer.appendChild(notification);
+    
+    setTimeout(() => {
+        if (notification.parentElement) {
+            notification.style.animation = 'slideOutRight 0.3s ease-in';
+            setTimeout(() => notification.remove(), 300);
+        }
+    }, 5000);
+    
+    notification.addEventListener('click', function() {
+        this.style.animation = 'slideOutRight 0.3s ease-in';
+        setTimeout(() => this.remove(), 300);
     });
 }
 
-// Initialize real-time updates when page loads
-setTimeout(() => {
-    initializeRealTimeUpdates();
-    testYourFirebaseConnection();
-}, 2000);
+// ==================== EVENT LISTENERS ====================
+
+document.addEventListener('DOMContentLoaded', function() {
+    initializeApp();
+    
+    const statusElement = document.createElement('div');
+    statusElement.id = 'connection-status';
+    statusElement.style.cssText = `
+        position: fixed;
+        bottom: 10px;
+        right: 10px;
+        background: rgba(0,0,0,0.8);
+        color: white;
+        padding: 5px 10px;
+        border-radius: 5px;
+        font-size: 12px;
+        z-index: 1000;
+    `;
+    document.body.appendChild(statusElement);
+    
+    updateConnectionStatus();
+});
+
+// Add CSS for notifications
+const notificationStyles = `
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOutRight {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+.real-time-notification {
+    transition: all 0.3s ease;
+}
+`;
+
+const styleSheet = document.createElement('style');
+styleSheet.textContent = notificationStyles;
+document.head.appendChild(styleSheet);
+
+// Basic event listeners
+document.getElementById('student-login-btn')?.addEventListener('click', studentLoginAction);
+document.getElementById('admin-login-btn')?.addEventListener('click', showAdminLogin);
+document.getElementById('login-btn')?.addEventListener('click', adminLoginAction);
+document.getElementById('start-exam-btn')?.addEventListener('click', startExam);
+document.getElementById('back-to-login')?.addEventListener('click', backToMainLogin);
+document.getElementById('back-to-student-login')?.addEventListener('click', backToMainLogin);
+document.getElementById('logout-btn')?.addEventListener('click', adminLogout);
+document.getElementById('logout-after-exam')?.addEventListener('click', backToMainLogin);
+document.getElementById('prev-btn')?.addEventListener('click', showPreviousQuestion);
+document.getElementById('next-btn')?.addEventListener('click', showNextQuestion);
+document.getElementById('submit-exam-btn')?.addEventListener('click', submitExam);
+document.getElementById('retake-exam-btn')?.addEventListener('click', retakeExam);
+document.getElementById('print-result-btn')?.addEventListener('click', printStudentResult);
+document.getElementById('print-admin-results')?.addEventListener('click', printAdminResults);
+document.getElementById('add-student-btn')?.addEventListener('click', addStudentRealTime);
+document.getElementById('export-results')?.addEventListener('click', exportToExcel);
+document.getElementById('export-students')?.addEventListener('click', exportStudentsToExcel);
+
+// Class selection buttons
+document.querySelectorAll('.class-select').forEach(button => {
+    button.addEventListener('click', async function() {
+        const level = this.getAttribute('data-level');
+        currentState.selectedClass = level;
+        
+        const student = students.find(s => s.id === currentState.studentId && s.name === currentState.studentName);
+        if (student && (student.autoRegistered || !student.class)) {
+            student.class = level;
+            student.arm = null;
+            await saveStudentsToFirebase();
+        }
+        
+        showArmsSelection(level);
+        
+        document.querySelectorAll('.class-select').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        this.classList.add('active');
+    });
+});
+
+// Admin filters
+document.getElementById('class-select-admin')?.addEventListener('change', loadAdminResults);
+document.getElementById('arm-select-admin')?.addEventListener('change', loadAdminResults);
+document.getElementById('filter-class')?.addEventListener('change', loadStudents);
+document.getElementById('filter-arm')?.addEventListener('change', loadStudents);
+document.getElementById('search-student')?.addEventListener('input', loadStudents);
+
+// Signature uploads
+document.getElementById('coordinator-signature-upload')?.addEventListener('change', function(e) {
+    handleSignatureUpload(e, 'coordinator');
+});
+document.getElementById('principal-signature-upload')?.addEventListener('change', function(e) {
+    handleSignatureUpload(e, 'principal');
+});
+document.getElementById('remove-coordinator-signature')?.addEventListener('click', function() {
+    removeSignature('coordinator');
+});
+document.getElementById('remove-principal-signature')?.addEventListener('click', function() {
+    removeSignature('principal');
+});
+
+console.log('CBT System JavaScript loaded successfully!');
