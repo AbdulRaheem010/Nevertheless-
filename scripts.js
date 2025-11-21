@@ -1,6 +1,4 @@
-// ==================== FIREBASE CONFIGURATION ====================
 
-// Your Complete Firebase Configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBP_fCdJA97dCGhofYnz0NlrCrD6jipljY",
   authDomain: "cbt-exam-7f4e6.firebaseapp.com",
@@ -12,12 +10,12 @@ const firebaseConfig = {
   measurementId: "G-P2VLSP13B6"
 };
 
-// Firebase variables
+
 let app;
 let database;
 let realTimeEnabled = false;
 
-// Initialize Firebase
+
 try {
     if (typeof firebase !== 'undefined') {
         app = firebase.initializeApp(firebaseConfig);
@@ -25,7 +23,7 @@ try {
         console.log('Firebase initialized successfully');
         realTimeEnabled = true;
         
-        // Initialize real-time listeners
+
         initializeRealTimeListeners();
     } else {
         console.warn('Firebase SDK not loaded - running in offline mode');
@@ -36,14 +34,12 @@ try {
     realTimeEnabled = false;
 }
 
-// ==================== REAL-TIME DATA SYNC ====================
-
 function initializeRealTimeListeners() {
     if (!realTimeEnabled) return;
     
     console.log('Setting up real-time listeners...');
     
-    // Listen for student data changes
+   
     database.ref('students').on('value', (snapshot) => {
         const firebaseStudents = snapshot.val();
         if (firebaseStudents && Array.isArray(firebaseStudents)) {
@@ -57,7 +53,7 @@ function initializeRealTimeListeners() {
         }
     });
     
-    // Listen for exam results changes
+   
     database.ref('examResults').on('value', (snapshot) => {
         const resultsData = snapshot.val();
         let results = [];
@@ -78,7 +74,7 @@ function initializeRealTimeListeners() {
         }
     });
     
-    // Listen for signature changes
+    
     database.ref('signatures').on('value', (snapshot) => {
         const firebaseSignatures = snapshot.val();
         if (firebaseSignatures) {
@@ -89,7 +85,7 @@ function initializeRealTimeListeners() {
         }
     });
     
-    // Listen for question database changes
+    
     database.ref('questions').on('value', (snapshot) => {
         const firebaseQuestions = snapshot.val();
         if (firebaseQuestions) {
@@ -102,7 +98,7 @@ function initializeRealTimeListeners() {
         }
     });
     
-    // Listen for admin corrections
+    
     database.ref('admin/corrections').on('value', (snapshot) => {
         const corrections = snapshot.val();
         if (corrections) {
@@ -149,7 +145,6 @@ function applyQuestionUpdate(update) {
     }
 }
 
-// ==================== ENHANCED FIREBASE FUNCTIONS ====================
 
 async function saveStudentsToFirebase() {
     if (!realTimeEnabled) {
@@ -293,7 +288,7 @@ async function loadSignaturesFromFirebase() {
     }
 }
 
-// ==================== QUESTIONS DATABASE ====================
+
 
 const questionsDatabase = {
     "JSS1": [
@@ -311,22 +306,22 @@ const questionsDatabase = {
         { question: "How do you add a new sprite to your project?", options: ["Press the green flag", "Click the 'Choose a Sprite' button", "Press delete", "Right-click the stage"], correct: 1 },
         { question: "Where is the power button typically located on a desktop computer?", options: [ "Only on the front of the computer case","Only on the keyboard","On the front of the computer case or sometimes on the side/back of monitor","Exclusively on the monitor"],correct: 2 },
         { question: "What is the first step in creating a new folder?", options: ["Right-click on an empty area","Press the Enter key","Go to the desired location","Type a name for the folder"], correct: 2 },
-        { question: "Which function key is used to refresh or reload a website in a browser?", options: ["F2","F3","F4", "F5"], correct: 3 },
+        { question: "Scratch is used for all the following except?", options: ["Collaborating", "Creating Games", "Creating Animations", "Marketing"], correct: 3 },
         { question: "How do you stop all scripts in Scratch?", options: ["Green flag", "Red stop sign", "Yellow pause button", "Blue play button"], correct: 1 },
         { question: "After right-clicking to create a new folder, what should you do next?", options: ["Press the Space bar","Hover over 'New' and select 'Folder'","Use the Backspace key","Press F1 for help"], correct: 1 },
-        { question: "What does the 'glide' block do?", options: ["Makes sprite jump", "Moves sprite smoothly to a position", "Rotates sprite", "Changes sprite color"], correct: 1 },
-        { question: "How many sprites can you have in a Scratch project?", options: ["Only 1", "Up to 10", "Up to 100", "Unlimited"], correct: 3 },
+        { question: "What are Sprites in Scratch?", options: ["Characters and objects in the program","Background images","Sound effects","Coding blocks"], correct: 0 },
+        { question: "Scratch was created  by ____?", options: ["MIT LAB", "PSSA", "Uncle ABDUL", "Techxagon"], correct: 0 },
         { question: "What is a backdrop in Scratch?", options: ["A sprite costume", "A background image for the stage", "A type of sound", "A programming block"], correct: 1 },
-        { question: "Which block changes a sprite's size?", options: ["Change size by", "Set size to", "Grow by", "Make bigger"], correct: 0 },
-        { question: "What does the 'next costume' block do?", options: ["Deletes the costume", "Changes to the next costume in the list", "Creates a new costume", "Copies the costume"], correct: 1 },
+        { question: "What is the Block Palette in Scratch?", options: ["Contains coding blocks that can be dragged and dropped","Where sprites are stored","The area for editing backgrounds","The sound effects library"], correct: 0 },
+        { question: "What is the Script Area in Scratch?", options: ["Where blocks are assembled to create programs","Where sprites are designed","Where sounds are edited","Where backgrounds are stored"],correct: 0 },
         { question: "Where do you find the blocks to program your sprite?", options: ["The stage", "The blocks palette", "The sprite list", "The menu bar"], correct: 1 },
-        { question: "What color are the Looks blocks in Scratch?", options: ["Blue", "Purple", "Green", "Orange"], correct: 1 },
-        { question: "Which block makes a sprite spin?", options: ["Turn clockwise", "Spin around", "Rotate", "Turn degrees"], correct: 3 },
-        { question: "How do you save your Scratch project?", options: ["Press the green flag", "Click File > Save", "It saves automatically", "Both B and C"], correct: 3 },
-        { question: "What does the 'go to x: y:' block do?", options: ["Deletes the sprite", "Moves sprite to a specific position", "Changes sprite color", "Plays a sound"], correct: 1 },
-        { question: "Which block makes a sprite appear in front of others?", options: ["Go to front layer", "Move to front", "Go to front", "Both A and B"], correct: 0 },
-        { question: "What happens when you click on a sprite?", options: ["It deletes", "Scripts with 'when this sprite clicked' run", "Nothing", "It duplicates"], correct: 1 },
-        { question: "Which key combination opens a new Scratch project?", options: ["Ctrl + N", "Ctrl + S", "Ctrl + O", "Ctrl + P"], correct: 0 }
+        { question: "What can users create with Scratch?",options: ["Games, stories, and animations","Word documents","Spreadsheets","Web browsers"], correct: 0 },
+        { question: "What is the main purpose of the Paint Editor?", options: ["To create and edit sprites or backgrounds","To write code","To add sound effects","To control the stage"],correct: 0 },
+        { question: "What does the Shift key help you type?", options: ["Capital letters and special symbols","Only lowercase letters","Numbers only","Programming code"], correct: 0 },
+        { question: "What is the function of the Caps Lock key?", options: ["Types all capital letters","Deletes text","Saves the document","Opens menus"], correct: 0 },
+        { question: "What does the Sounds tab contain?", options: ["All sounds that can be used in Scratch programs","Different sprite costumes","Coding blocks","Background images"], correct: 0 },
+        { question: "What is the common shortcut for Undo in most programs?", options: ["Ctrl+Z","Ctrl+C","Ctrl+V","Ctrl+X"], correct: 0 },
+        { question: "What is the common shortcut for copy in most programs?", options: ["Ctrl+Z","Ctrl+C","Ctrl+V","Ctrl+X"], correct: 1 }
     ],
     "JSS2": [
         { question: "What does the 'repeat' block do?", options: ["Runs code once", "Runs code multiple times", "Stops the program", "Deletes code"], correct: 1 },
@@ -336,161 +331,161 @@ const questionsDatabase = {
         { question: "What does the 'if-then' block do?", options: ["Repeats code", "Checks a condition and runs code if true", "Stops all scripts", "Creates a variable"], correct: 1 },
         { question: "What color are the Control blocks?", options: ["Blue", "Purple", "Yellow", "Orange"], correct: 2 },
         { question: "What does the 'broadcast' block do?", options: ["Plays a sound loudly", "Sends a message to all sprites", "Deletes sprites", "Changes backdrops"], correct: 1 },
-        { question: "Which block detects if a sprite is touching another sprite?", options: ["Touching?", "Near?", "Collision?", "Hit?"], correct: 0 },
+        { question: "What is the common shortcut for Undo in most programs?", options: ["Ctrl+Z","Ctrl+C","Ctrl+V","Ctrl+X"], correct: 0 },
         { question: "What is the purpose of the 'wait until' block?", options: ["Waits a fixed time", "Waits until a condition is true", "Stops forever", "Deletes the sprite"], correct: 1 },
-        { question: "How do you make a sprite respond to keyboard input?", options: ["Use 'when key pressed' block", "Use 'if key pressed' block", "Use 'key sensing' block", "Both A and B"], correct: 3 },
-        { question: "What does the 'ask and wait' block do?", options: ["Makes sprite speak", "Gets input from the user", "Waits randomly", "Broadcasts a message"], correct: 1 },
-        { question: "Where is the user's answer stored after using 'ask and wait'?", options: ["In a variable", "In the 'answer' block", "In the stage", "It's not stored"], correct: 1 },
-        { question: "What does 'if-then-else' block do differently than 'if-then'?", options: ["Nothing different", "Runs different code when condition is false", "Repeats forever", "Stops the program"], correct: 1 },
-        { question: "Which operator checks if two values are equal?", options: ["=", "==", "equals", "The = block in Operators"], correct: 3 },
+        { question: "What is the common shortcut for copy in most programs?", options: ["Ctrl+Z","Ctrl+C","Ctrl+V","Ctrl+X"], correct: 1 },
+        { question: "What does the Shift key help you type?", options: ["Capital letters and special symbols","Only lowercase letters","Numbers only","Programming code"], correct: 0 },
+        { question: "What is the first step in creating a new folder?", options: ["Right-click on an empty area","Press the Enter key","Go to the desired location","Type a name for the folder"], correct: 2 },
+        { question: "What is the main purpose of refreshing your computer screen?", options: ["To turn off the computer","To create new folders","To see the most current version of content","To edit cell content in Excel"], correct: 2 },
+        { question: "What is the common shortcut for paste in most programs?", options: ["Ctrl+Z","Ctrl+C","Ctrl+V","Ctrl+X"], correct: 2 },
         { question: "What color are the Sensing blocks?", options: ["Light blue", "Dark blue", "Green", "Purple"], correct: 0 },
         { question: "How can you make a sprite follow your mouse pointer?", options: ["Use 'go to mouse-pointer' in a forever loop", "Use 'follow mouse' block", "It's automatic", "Use 'when mouse moves'"], correct: 0 },
-        { question: "What does the 'change x by' block do?", options: ["Changes sprite color", "Moves sprite horizontally", "Changes sprite size", "Rotates sprite"], correct: 1 },
-        { question: "Which block would you use to create a random number?", options: ["Random block", "Pick random", "Choose number", "Get random"], correct: 1 },
-        { question: "What does the 'set x to' block do?", options: ["Changes sprite size", "Sets horizontal position", "Sets sprite color", "Deletes sprite"], correct: 1 },
-        { question: "How do you create a countdown timer in Scratch?", options: ["Use a variable and decrease it in a loop", "Use the timer block", "Use the clock block", "It's built-in"], correct: 0 },
-        { question: "What does the 'when I receive' block do?", options: ["Receives keyboard input", "Listens for broadcast messages", "Receives mouse clicks", "Receives sprite touches"], correct: 1 },
-        { question: "Which block allows you to add two numbers?", options: ["Plus block", "Add block", "The + block in Operators", "Sum block"], correct: 2 },
+        { question: "What does the Backspace key primarily do?", options: ["Create new folders","Refresh the computer screen","Delete what was just typed", "Start a slideshow"],correct: 2 },
+        { question: "What is the primary function of the Enter key?", options: ["To delete text", "To give spaces between words", "To start execution or submit a command", "To open search functions"], correct: 2 },
+        { question: "What is Scratch primarily used for?", options: ["Creating games and animations", "Writing documents", "Browsing the internet", "Sending emails"], correct: 0 },
+        { question: "What is the Block Palette in Scratch?", options: ["Contains coding blocks that can be dragged and dropped","Where sprites are stored","The area for editing backgrounds","The sound effects library"], correct: 0 },
+        { question: "What color are the Motion blocks in Scratch?", options: ["Purple", "Blue", "Green", "Orange"], correct: 1 },
+        { question: "Which block category controls sprite movement in Scratch?", options: ["Looks", "Motion", "Sound", "Events"], correct: 1 },
         { question: "What does 'repeat until' do?", options: ["Repeats a fixed number of times", "Repeats until a condition becomes true", "Never repeats", "Repeats forever"], correct: 1 },
-        { question: "How can you make a sprite bounce off the edge?", options: ["Use 'if on edge, bounce' block", "Use 'bounce' block", "Use 'turn around' block", "It's automatic"], correct: 0 },
+        { question: "Scratch was created  by ____?", options: ["MIT LAB", "PSSA", "Uncle ABDUL", "Techxagon"], correct: 0  },
         { question: "What does the 'touching color' block check?", options: ["Sprite's color", "If sprite touches a specific color", "Stage background color", "Color of another sprite"], correct: 1 },
         { question: "Which block makes sprites interact with each other?", options: ["Connect block", "Broadcast and receive blocks", "Link block", "Join block"], correct: 1 },
         { question: "What is the purpose of the 'stop' block?", options: ["Stops sprite movement", "Stops specific scripts or all scripts", "Stops sound", "Stops the project"], correct: 1 },
-        { question: "How do you check if a key is being pressed continuously?", options: ["Use 'when key pressed'", "Use 'key pressed?' in an if block", "Use 'key down' block", "Use 'listening key' block"], correct: 1 },
-        { question: "What does the 'loudness' sensing block detect?", options: ["Volume of sounds in project", "Microphone input volume", "Speaker volume", "Music loudness"], correct: 1 },
+        { question: "Where do you find the blocks to program your sprite?", options: ["The stage", "The blocks palette", "The sprite list", "The menu bar"], correct: 1 },
+        { question: "What does the green flag do in Scratch?", options: ["Stops the program", "Starts the program", "Saves the project", "Deletes the sprite"], correct: 1 },
         { question: "How can you create a score system in a game?", options: ["Use a 'score' sprite", "Create a variable called 'score' and change it", "Use the score block", "Use a list"], correct: 1 }
     ],
     "JSS3": [
-        { question: "What is cloning in Scratch?", options: ["Copying a project", "Creating temporary copies of a sprite", "Duplicating backgrounds", "Copying blocks"], correct: 1 },
-        { question: "Which block creates a clone of a sprite?", options: ["Create clone", "Make clone", "Clone myself", "Create clone of myself"], correct: 3 },
-        { question: "What happens to clones when the project stops?", options: ["They remain", "They are automatically deleted", "They turn invisible", "They become permanent"], correct: 1 },
-        { question: "What is a list in Scratch?", options: ["A type of sprite", "A collection of items stored in order", "A broadcast message", "A costume list"], correct: 1 },
-        { question: "Which category contains list blocks?", options: ["Control", "Data", "Variables", "Operators"], correct: 1 },
-        { question: "What does the 'join' operator block do?", options: ["Connects sprites", "Combines two text strings", "Adds numbers", "Joins lists"], correct: 1 },
-        { question: "How do you delete a clone?", options: ["Use 'delete clone' block", "Use 'delete this clone' block", "Use 'remove clone' block", "Clones delete automatically"], correct: 1 },
-        { question: "What is the purpose of custom blocks (My Blocks)?", options: ["To create reusable code", "To make new sprites", "To add new categories", "To import blocks"], correct: 0 },
-        { question: "Which block would you use to detect the distance to another sprite?", options: ["Distance to", "Space between", "Gap to", "Range to"], correct: 0 },
-        { question: "What does the 'pen down' block do?", options: ["Writes text", "Makes sprite draw as it moves", "Lowers sprite", "Points downward"], correct: 1 },
-        { question: "How can you create different difficulty levels in a game?", options: ["Create multiple projects", "Use variables to adjust game parameters", "It's not possible", "Use different sprites"], correct: 1 },
-        { question: "What is the purpose of the 'video sensing' extension?", options: ["Play videos", "Detect motion from camera", "Record videos", "Edit videos"], correct: 1 },
-        { question: "Which block converts text to uppercase?", options: ["Uppercase block", "Text to upper", "Letter of block with operators", "Scratch has no text conversion"], correct: 2 },
-        { question: "What does 'mod' operator do?", options: ["Multiplies numbers", "Gives remainder of division", "Modifies sprites", "Rounds numbers"], correct: 1 },
-        { question: "How do you create collision detection in a game?", options: ["Use 'touching?' block", "Use 'collision' block", "Use 'hit' block", "Use distance calculations"], correct: 0 },
-        { question: "What is a boolean value?", options: ["A number", "True or False", "A text string", "A sprite property"], correct: 1 },
-        { question: "Which blocks return boolean values?", options: ["Operator comparison blocks", "All sensing blocks", "Motion blocks", "Sound blocks"], correct: 0 },
-        { question: "How can you make a sprite follow a path?", options: ["Use pre-defined paths", "Use coordinates and glide blocks in sequence", "Use 'follow path' block", "Draw on stage"], correct: 1 },
-        { question: "What does the 'set drag mode' block do?", options: ["Drags all sprites", "Controls if sprite can be dragged by mouse", "Drags backdrops", "Speeds up dragging"], correct: 1 },
-        { question: "How do you create a scrolling background?", options: ["Use scrolling extension", "Move backdrop continuously", "Use multiple backdrops and switch them", "Use camera movement"], correct: 2 },
-        { question: "What is the purpose of the 'timer' block?", options: ["Sets alarms", "Counts seconds since project started", "Creates countdown", "Stops time"], correct: 1 },
-        { question: "How can you make sprites communicate with each other?", options: ["Use telephone blocks", "Use broadcast messages", "Use sprite links", "Direct sprite commands"], correct: 1 },
-        { question: "What does 'contains' operator check in lists?", options: ["If list is empty", "If list contains a specific item", "List size", "List color"], correct: 1 },
-        { question: "How do you optimize a Scratch project for better performance?", options: ["Delete unused sprites and scripts", "Use smaller costumes", "Limit forever loops", "All of the above"], correct: 3 },
-        { question: "What is the purpose of 'stop other scripts in sprite'?", options: ["Stops all projects", "Stops other scripts while running current one", "Stops stage scripts", "Stops sound"], correct: 1 },
-        { question: "How can you create a health system in a game?", options: ["Use health extension", "Create a health variable and decrease on damage", "Use special health block", "Use sprite costumes"], correct: 1 },
-        { question: "What does 'round' operator do?", options: ["Makes sprite round", "Rounds number to nearest integer", "Creates circles", "Rotates sprites"], correct: 1 },
-        { question: "How do you create AI opponents in a game?", options: ["Use AI blocks", "Program movement patterns with conditionals", "Import AI sprites", "It's not possible"], correct: 1 },
-        { question: "What is the 'stamp' block used for?", options: ["Adding text", "Leaving an image of sprite on stage", "Collecting items", "Marking positions"], correct: 1 },
-        { question: "How can you make a two-player game in Scratch?", options: ["Use two computers", "Assign different keys to different sprites", "Use multiplayer extension", "Not possible in Scratch"], correct: 1 }
+        { question: "What does the 'repeat' block do?", options: ["Runs code once", "Runs code multiple times", "Stops the program", "Deletes code"], correct: 1 },
+        { question: "Which block would you use to create a forever loop?", options: ["Repeat", "Forever", "Loop", "While"], correct: 1 },
+        { question: "What is a variable in Scratch?", options: ["A sprite", "A storage space for data", "A sound", "A backdrop"], correct: 1 },
+        { question: "Where do you create variables in Scratch?", options: ["Motion category", "Data category", "Events category", "Control category"], correct: 1 },
+        { question: "What does the 'if-then' block do?", options: ["Repeats code", "Checks a condition and runs code if true", "Stops all scripts", "Creates a variable"], correct: 1 },
+        { question: "What color are the Control blocks?", options: ["Blue", "Purple", "Yellow", "Orange"], correct: 2 },
+        { question: "What does the 'broadcast' block do?", options: ["Plays a sound loudly", "Sends a message to all sprites", "Deletes sprites", "Changes backdrops"], correct: 1 },
+        { question: "What is the common shortcut for Undo in most programs?", options: ["Ctrl+Z","Ctrl+C","Ctrl+V","Ctrl+X"], correct: 0 },
+        { question: "What is the purpose of the 'wait until' block?", options: ["Waits a fixed time", "Waits until a condition is true", "Stops forever", "Deletes the sprite"], correct: 1 },
+        { question: "What is the common shortcut for copy in most programs?", options: ["Ctrl+Z","Ctrl+C","Ctrl+V","Ctrl+X"], correct: 1 },
+        { question: "What does the Shift key help you type?", options: ["Capital letters and special symbols","Only lowercase letters","Numbers only","Programming code"], correct: 0 },
+        { question: "What is the first step in creating a new folder?", options: ["Right-click on an empty area","Press the Enter key","Go to the desired location","Type a name for the folder"], correct: 2 },
+        { question: "What is the main purpose of refreshing your computer screen?", options: ["To turn off the computer","To create new folders","To see the most current version of content","To edit cell content in Excel"], correct: 2 },
+        { question: "Which operator checks if two values are equal?", options: ["=", "==", "equals", "The = block in Operators"], correct: 3 },
+        { question: "What color are the Sensing blocks?", options: ["Light blue", "Dark blue", "Green", "Purple"], correct: 0 },
+        { question: "How can you make a sprite follow your mouse pointer?", options: ["Use 'go to mouse-pointer' in a forever loop", "Use 'follow mouse' block", "It's automatic", "Use 'when mouse moves'"], correct: 0 },
+        { question: "What does the Backspace key primarily do?", options: ["Create new folders","Refresh the computer screen","Delete what was just typed", "Start a slideshow"],correct: 2 },
+        { question: "What is the primary function of the Enter key?", options: ["To delete text", "To give spaces between words", "To start execution or submit a command", "To open search functions"], correct: 2 },
+        { question: "What is Scratch primarily used for?", options: ["Creating games and animations", "Writing documents", "Browsing the internet", "Sending emails"], correct: 0 },
+        { question: "What is the Block Palette in Scratch?", options: ["Contains coding blocks that can be dragged and dropped","Where sprites are stored","The area for editing backgrounds","The sound effects library"], correct: 0 },
+        { question: "What color are the Motion blocks in Scratch?", options: ["Purple", "Blue", "Green", "Orange"], correct: 1 },
+        { question: "Which block category controls sprite movement in Scratch?", options: ["Looks", "Motion", "Sound", "Events"], correct: 1 },
+        { question: "What does 'repeat until' do?", options: ["Repeats a fixed number of times", "Repeats until a condition becomes true", "Never repeats", "Repeats forever"], correct: 1 },
+        { question: "Scratch was created  by ____?", options: ["MIT LAB", "PSSA", "Uncle ABDUL", "Techxagon"], correct: 0  },
+        { question: "What does the 'touching color' block check?", options: ["Sprite's color", "If sprite touches a specific color", "Stage background color", "Color of another sprite"], correct: 1 },
+        { question: "Which block makes sprites interact with each other?", options: ["Connect block", "Broadcast and receive blocks", "Link block", "Join block"], correct: 1 },
+        { question: "What is the purpose of the 'stop' block?", options: ["Stops sprite movement", "Stops specific scripts or all scripts", "Stops sound", "Stops the project"], correct: 1 },
+        { question: "Where do you find the blocks to program your sprite?", options: ["The stage", "The blocks palette", "The sprite list", "The menu bar"], correct: 1 },
+        { question: "What does the green flag do in Scratch?", options: ["Stops the program", "Starts the program", "Saves the project", "Deletes the sprite"], correct: 1 },
+        { question: "How can you create a score system in a game?", options: ["Use a 'score' sprite", "Create a variable called 'score' and change it", "Use the score block", "Use a list"], correct: 1 }
     ],
     "SS1": [
-        { question: "What does HTML stand for?", options: ["Hyper Text Markup Language", "High Tech Modern Language", "Hyper Transfer Markup Language", "Home Tool Markup Language"], correct: 0 },
-        { question: "Which tag is used to create a hyperlink?", options: ["&lt;link&gt;", "&lt;a&gt;", "&lt;href&gt;", "&lt;url&gt;"], correct: 1 },
-        { question: "What is the correct HTML element for the largest heading?", options: ["&lt;head&gt;", "&lt;h6&gt;", "&lt;h1&gt;", "&lt;heading&gt;"], correct: 2 },
-        { question: "How do you create a comment in HTML?", options: ["// This is a comment", "&lt;!-- This is a comment --&gt;", "/* This is a comment */", "' This is a comment"], correct: 1 },
-        { question: "Which tag is used to display an image?", options: ["&lt;image&gt;", "&lt;img&gt;", "&lt;picture&gt;", "&lt;src&gt;"], correct: 1 },
-        { question: "What is the correct HTML for creating a line break?", options: ["&lt;break&gt;", "&lt;lb&gt;", "&lt;br&gt;", "&lt;newline&gt;"], correct: 2 },
-        { question: "Which attribute specifies the destination of a hyperlink?", options: ["link", "href", "src", "url"], correct: 1 },
-        { question: "What is the correct HTML element for inserting a paragraph?", options: ["&lt;paragraph&gt;", "&lt;para&gt;", "&lt;p&gt;", "&lt;text&gt;"], correct: 2 },
-        { question: "Which tag is used to create an unordered list?", options: ["&lt;ul&gt;", "&lt;ol&gt;", "&lt;list&gt;", "&lt;li&gt;"], correct: 0 },
-        { question: "What does the &lt;title&gt; tag define?", options: ["A heading on the page", "The page title in browser tab", "A subtitle", "The main title visible on page"], correct: 1 },
-        { question: "Which HTML tag is used for the smallest heading?", options: ["&lt;h1&gt;", "&lt;h6&gt;", "&lt;small&gt;", "&lt;heading6&gt;"], correct: 1 },
-        { question: "What is the purpose of the &lt;!DOCTYPE html&gt; declaration?", options: ["It's a comment", "It defines the document type and HTML version", "It's optional", "It creates a title"], correct: 1 },
-        { question: "Which tag contains metadata about the HTML document?", options: ["&lt;meta&gt;", "&lt;head&gt;", "&lt;title&gt;", "&lt;info&gt;"], correct: 1 },
-        { question: "How do you create a numbered list in HTML?", options: ["&lt;ul&gt;", "&lt;ol&gt;", "&lt;nl&gt;", "&lt;dl&gt;"], correct: 1 },
-        { question: "What is the correct HTML for making text bold?", options: ["&lt;b&gt;", "&lt;bold&gt;", "&lt;strong&gt;", "Both A and C"], correct: 3 },
-        { question: "Which attribute specifies alternative text for an image?", options: ["title", "alt", "text", "description"], correct: 1 },
-        { question: "What does the &lt;body&gt; tag contain?", options: ["Metadata", "The visible page content", "CSS styles", "JavaScript code"], correct: 1 },
-        { question: "How do you create a table in HTML?", options: ["&lt;table&gt;", "&lt;tab&gt;", "&lt;grid&gt;", "&lt;tbl&gt;"], correct: 0 },
-        { question: "Which tag is used for table rows?", options: ["&lt;row&gt;", "&lt;tr&gt;", "&lt;td&gt;", "&lt;table-row&gt;"], correct: 1 },
-        { question: "What is the correct HTML for creating a text input field?", options: ["&lt;input type='text'&gt;", "&lt;textbox&gt;", "&lt;textinput&gt;", "&lt;text&gt;"], correct: 0 },
-        { question: "Which tag defines table data/cells?", options: ["&lt;data&gt;", "&lt;cell&gt;", "&lt;td&gt;", "&lt;tc&gt;"], correct: 2 },
-        { question: "How do you make text italic in HTML?", options: ["&lt;italic&gt;", "&lt;i&gt;", "&lt;it&gt;", "&lt;em&gt;"], correct: 1 },
-        { question: "What is the purpose of the &lt;div&gt; tag?", options: ["Creates divisions/sections", "Divides text", "Creates tables", "Makes text bold"], correct: 0 },
-        { question: "Which tag is used to create a form?", options: ["&lt;form&gt;", "&lt;input&gt;", "&lt;submit&gt;", "&lt;field&gt;"], correct: 0 },
-        { question: "What does the &lt;span&gt; tag do?", options: ["Creates a line break", "Groups inline elements", "Creates a section", "Makes text span multiple lines"], correct: 1 },
-        { question: "How do you create a button in HTML?", options: ["&lt;button&gt;", "&lt;btn&gt;", "&lt;input type='button'&gt;", "Both A and C"], correct: 3 },
-        { question: "Which tag is used to define a footer for a document?", options: ["&lt;bottom&gt;", "&lt;footer&gt;", "&lt;foot&gt;", "&lt;end&gt;"], correct: 1 },
-        { question: "What is the correct HTML for adding a background color?", options: ["&lt;body bg='yellow'&gt;", "&lt;body style='background-color:yellow'&gt;", "&lt;background&gt;yellow&lt;/background&gt;", "&lt;body color='yellow'&gt;"], correct: 1 },
-        { question: "Which HTML element defines navigation links?", options: ["&lt;navigation&gt;", "&lt;nav&gt;", "&lt;links&gt;", "&lt;menu&gt;"], correct: 1 },
-        { question: "What is semantic HTML?", options: ["HTML with meaning", "HTML with proper structure and meaningful tags", "HTML with comments", "HTML with CSS"], correct: 1 }
+        { question: "What does HTML stand for?", options: ["Hyperlinks and Text Marking Language","HyperText Markup Language","HighText Machine Language","Home Tool Markup Language"], correct: 1 },
+        { question: "Which of the following is used to view web pages?", options: ["Compiler","Browser","Terminal","Editor"],correct: 1 },
+        { question: "Which of the following is NOT a web browser?", options: ["Chrome","Firefox","VS Code", "Edge"], correct: 2 },
+        { question: "What is a webpage?", options: ["A software used to browse the Internet","A single document on the web","A collection of related websites","A computer network"],correct: 1 },
+        { question: "Which tag is used for the largest heading?", options: ["&lt;h6&gt;","&lt;head&gt;","&lt;h1&gt;","&lt;h0&gt;"], correct: 2 },
+        { question: "What does the &lt;p&gt; tag represent?", options: ["Picture","Page","Paragraph","Program"], correct: 2 },
+        { question: "Which tag is used to create a line break?", options: ["&lt;line&gt;","&lt;lb&gt;","&lt;br&gt;","&lt;break&gt;"], correct: 2 },
+        { question: "Which tag creates a horizontal line across the page?", options: ["&lt;hr&gt;","&lt;line&gt;","&lt;row&gt;","&lt;break&gt;"], correct: 0 },
+        { question: "Which tag is used to make text bold?", options: ["&lt;bold&gt;","&lt;b&gt;","&lt;stronger&gt;","&lt;big&gt;"], correct: 1 },
+        { question: "What does the &lt;i&gt; tag do?", options: ["Makes text bold","Makes text italic","Inserts image","Adds a link"], correct: 1 },
+        { question: "Which tag highlights text?", options: ["&lt;highlight&gt;","&lt;mark&gt;","&lt;hi&gt;","&lt;note&gt;"], correct: 1 },
+        { question: "What is the correct tag for superscript?", options: ["&lt;super&gt;","&lt;up&gt;","&lt;sup&gt;","&lt;sub&gt;"], correct: 2 },
+        { question: "What does the &lt;ul&gt; tag represent?", options: ["Upper list","Unordered list","Underlined list","Upload list"], correct: 1 },
+        { question: "Which list type displays items with numbers?", options: ["&lt;ol&gt;","&lt;ul&gt;","&lt;li&gt;","&lt;ln&gt;"], correct: 0 },
+        { question: "The &lt;li&gt; tag is used for…", options: ["Links","Lists","Lines","Left alignment"], correct: 1 },
+        { question: "What is the tag for emphasized text?", options: ["&lt;emp&gt;","&lt;strong&gt;","&lt;em&gt;","&lt;i&gt;"], correct: 2 },
+        { question: "Which sentence is TRUE?", options: ["A website is a page inside a webpage.","A webpage is a collection of websites.","A website contains multiple webpages.","A website and a webpage are the same."], correct: 2 },
+        { question: "The tag that contains the visible part of an HTML document is:", options: ["&lt;head&gt;","&lt;html&gt;","&lt;body&gt;","&lt;title&gt;"], correct: 2 },
+        { question: "Which of the following is correct HTML structure?", options: ["&lt;html&gt;&lt;body&gt;&lt;head&gt;&lt;/head&gt;&lt;/body&gt;&lt;/html&gt;","&lt;html&gt;&lt;head&gt;&lt;/head&gt;&lt;body&gt;&lt;/body&gt;&lt;/html&gt;","&lt;head&gt;&lt;html&gt;&lt;/html&gt;&lt;/head&gt;","&lt;body&gt;&lt;head&gt;&lt;html&gt;&lt;/html&gt;&lt;/head&gt;&lt;/body&gt;"], correct: 1 },
+        { question: "Which tag creates a subscript?", options: ["&lt;sub&gt;","&lt;down&gt;","&lt;sb&gt;","&lt;small&gt;"],correct: 0 },
+        { question: "Which key is described as 'the largest key' on the keyboard?", options: ["Enter key","Backspace key","Space bar key","Function key"],correct: 2 },
+        { question: "What is the main purpose of refreshing your computer screen?", options: ["To turn off the computer","To create new folders","To see the most current version of content","To edit cell content in Excel"], correct: 2 },
+        { question: "Which function key is typically used to open search within a program?", options: ["F1","F2", "F3","F4"], correct: 2 },
+        { question: "Where is the power button typically located on a desktop computer?", options: [ "Only on the front of the computer case","Only on the keyboard","On the front of the computer case or sometimes on the side/back of monitor","Exclusively on the monitor"],correct: 2 },
+        { question: "What is the first step in creating a new folder?", options: ["Right-click on an empty area","Press the Enter key","Go to the desired location","Type a name for the folder"], correct: 2 },
+        { question: "After right-clicking to create a new folder, what should you do next?", options: ["Press the Space bar","Hover over 'New' and select 'Folder'","Use the Backspace key","Press F1 for help"], correct: 1 },
+        { question: "What is the common shortcut for Undo in most programs?", options: ["Ctrl+Z","Ctrl+C","Ctrl+V","Ctrl+X"], correct: 0 },
+        { question: "What is the common shortcut for copy in most programs?", options: ["Ctrl+Z","Ctrl+C","Ctrl+V","Ctrl+X"], correct: 1 },
+        { question: "What is the function of the Caps Lock key?", options: ["Types all capital letters","Deletes text","Saves the document","Opens menus"], correct: 0 },
+        { question: "What is the primary function of the Enter key?", options: ["To delete text", "To give spaces between words", "To start execution or submit a command", "To open search functions"], correct: 2 }
     ],
     "SS2": [
-        { question: "What does CSS stand for?", options: ["Computer Style Sheets", "Cascading Style Sheets", "Creative Style System", "Colorful Style Sheets"], correct: 1 },
-        { question: "Which property changes text color in CSS?", options: ["text-color", "font-color", "color", "text-style"], correct: 2 },
-        { question: "How do you apply CSS to an HTML document?", options: ["Inline styles", "Internal stylesheet", "External stylesheet", "All of the above"], correct: 3 },
-        { question: "Which CSS property controls text size?", options: ["text-size", "font-size", "text-style", "size"], correct: 1 },
-        { question: "What is the correct CSS syntax for making all &lt;p&gt; elements bold?", options: ["p {font-weight: bold;}", "p {text-bold: true;}", "&lt;p style='bold'&gt;", "p {weight: bold;}"], correct: 0 },
-        { question: "How do you select an element with id='header'?", options: [".header", "#header", "header", "*header"], correct: 1 },
-        { question: "How do you select elements with class='intro'?", options: ["#intro", ".intro", "intro", "*intro"], correct: 1 },
-        { question: "Which property changes the background color?", options: ["bg-color", "background-color", "bgcolor", "color-background"], correct: 1 },
-        { question: "What is the correct CSS to center text?", options: ["text-align: center;", "align: center;", "text: center;", "center: text;"], correct: 0 },
-        { question: "Which property adds space inside an element's border?", options: ["margin", "padding", "spacing", "border-spacing"], correct: 1 },
-        { question: "Which property adds space outside an element's border?", options: ["margin", "padding", "spacing", "outside"], correct: 0 },
-        { question: "What is the CSS box model?", options: ["A box on the page", "Content, padding, border, and margin", "A container element", "A layout technique"], correct: 1 },
-        { question: "How do you make a border 5 pixels wide?", options: ["border-width: 5px;", "border: 5;", "border-size: 5px;", "border: width 5px;"], correct: 0 },
-        { question: "Which property changes the font family?", options: ["font-family", "font-name", "font-type", "typeface"], correct: 0 },
-        { question: "What does the 'display: none;' property do?", options: ["Makes text invisible", "Hides the element completely", "Removes background", "Makes element transparent"], correct: 1 },
-        { question: "Which property controls the stacking order of elements?", options: ["layer", "z-index", "stack", "order"], correct: 1 },
-        { question: "How do you make rounded corners?", options: ["corner-radius", "border-radius", "round-corner", "corner-style"], correct: 1 },
-        { question: "What is a CSS pseudo-class?", options: ["A fake class", "A special state of an element (like :hover)", "A temporary class", "An advanced class"], correct: 1 },
-        { question: "How do you select all &lt;p&gt; elements inside a &lt;div&gt;?", options: ["div + p", "div &gt; p", "div p", "div.p"], correct: 2 },
-        { question: "Which property makes text underlined?", options: ["text-decoration: underline;", "text-underline: true;", "underline: text;", "decoration: underline;"], correct: 0 },
-        { question: "What does 'position: relative;' do?", options: ["Positions element relative to its normal position", "Positions element relative to browser", "Positions element relative to parent", "Positions element relative to screen"], correct: 0 },
-        { question: "How do you create a flexbox container?", options: ["display: flex;", "flex: container;", "layout: flex;", "flexbox: true;"], correct: 0 },
-        { question: "Which property controls the space between lines of text?", options: ["text-spacing", "line-height", "line-spacing", "text-height"], correct: 1 },
-        { question: "What is the purpose of media queries?", options: ["To play media", "To create responsive designs", "To query databases", "To load images"], correct: 1 },
-        { question: "How do you change cursor to a pointer on hover?", options: ["cursor: pointer;", "mouse: pointer;", "cursor-type: pointer;", "pointer: cursor;"], correct: 0 },
-        { question: "Which property controls text transformation (uppercase/lowercase)?", options: ["text-style", "text-transform", "text-case", "transform-text"], correct: 1 },
-        { question: "What does 'display: block;' do?", options: ["Blocks the element", "Makes element take full width available", "Creates a block shape", "Blocks other elements"], correct: 1 },
-        { question: "How do you add a shadow to text?", options: ["text-shadow", "shadow", "font-shadow", "text-effect"], correct: 0 },
-        { question: "Which property controls element opacity?", options: ["transparency", "opacity", "visible", "alpha"], correct: 1 },
-        { question: "What is CSS Grid used for?", options: ["Creating grids on paper", "Two-dimensional layout system", "Drawing grid lines", "Table layouts only"], correct: 1 }
+        { question: "Which key is described as 'the largest key' on the keyboard?", options: ["Enter key","Backspace key","Space bar key","Function key"],correct: 2 },
+        { question: "What is the main purpose of refreshing your computer screen?", options: ["To turn off the computer","To create new folders","To see the most current version of content","To edit cell content in Excel"], correct: 2 },
+        { question: "Which function key is typically used to open search within a program?", options: ["F1","F2", "F3","F4"], correct: 2 },
+        { question: "Where is the power button typically located on a desktop computer?", options: [ "Only on the front of the computer case","Only on the keyboard","On the front of the computer case or sometimes on the side/back of monitor","Exclusively on the monitor"],correct: 2 },
+        { question: "What is the first step in creating a new folder?", options: ["Right-click on an empty area","Press the Enter key","Go to the desired location","Type a name for the folder"], correct: 2 },
+        { question: "After right-clicking to create a new folder, what should you do next?", options: ["Press the Space bar","Hover over 'New' and select 'Folder'","Use the Backspace key","Press F1 for help"], correct: 1 },
+        { question: "What is the common shortcut for Undo in most programs?", options: ["Ctrl+Z","Ctrl+C","Ctrl+V","Ctrl+X"], correct: 0 },
+        { question: "What is the common shortcut for copy in most programs?", options: ["Ctrl+Z","Ctrl+C","Ctrl+V","Ctrl+X"], correct: 1 },
+        { question: "What is the function of the Caps Lock key?", options: ["Types all capital letters","Deletes text","Saves the document","Opens menus"], correct: 0 },
+        { question: "What is the primary function of the Enter key?", options: ["To delete text", "To give spaces between words", "To start execution or submit a command", "To open search functions"], correct: 2 },
+        { question: "What does HTML stand for?", options: ["Hyperlinks and Text Marking Language","HyperText Markup Language","HighText Machine Language","Home Tool Markup Language"], correct: 1 },
+        { question: "Which of the following is used to view web pages?", options: ["Compiler","Browser","Terminal","Editor"],correct: 1 },
+        { question: "A webpage is best described as:", options: ["A collection of websites","A single document on the web","A computer program","An image on the internet"], correct: 1 },
+        { question: "Which of these is a search engine?", options: ["Chrome","Firefox","Google","VS Code"], correct: 2 },
+        { question: "Which of the following is an HTML button?", options: ["&lt;button&gt;Click me&lt;/button&gt;","&lt;click&gt;Click me&lt;/click&gt;","&lt;input type=\"pbutton\"&gt;","&lt;press&gt;Click&lt;/press&gt;"], correct: 0 },
+        { question: "HTML is used for:", options: ["Styling webpages","Adding logic","Structuring webpages","Creating databases"], correct: 2 },
+        { question: "Which part of this element is the attribute? &lt;a href=\"index.html\"&gt;Home&lt;/a&gt;", options: ["a","href","Home","index.html"], correct: 1 },
+        { question: "The root element of every HTML file is:", options: ["&lt;body&gt;","&lt;head&gt;","&lt;title&gt;","&lt;html&gt;"], correct: 3 },
+        { question: "Which tag is used to display a large heading?", options: ["&lt;h6&gt;","&lt;h5&gt;","&lt;h1&gt;","&lt;heading&gt;"], correct: 2 },
+        { question: "The tag used to create a paragraph is:", options: ["&lt;para&gt;","&lt;p&gt;","&lt;pg&gt;","&lt;paragraph&gt;"], correct: 1 },
+        { question: "Which tag creates a clickable link?", options: ["&lt;a&gt;","&lt;link&gt;","&lt;href&gt;","&lt;url&gt;"], correct: 0 },
+        { question: "What attribute is used to specify the link of an anchor tag?", options: ["src","link","href","ref"], correct: 2 },
+        { question: "Which tag is used to create a button in HTML?", options: ["&lt;btn&gt;","&lt;button&gt;","&lt;click&gt;","&lt;press&gt;"], correct: 1 },
+        { question: "Which part of the HTML file contains information about the page?", options: ["&lt;body&gt;","&lt;html&gt;","&lt;head&gt;","&lt;info&gt;"], correct: 2 },
+        { question: "Which tag displays content that users see on the webpage?", options: ["&lt;html&gt;","&lt;meta&gt;","&lt;head&gt;","&lt;body&gt;"], correct: 3 },
+        { question: "What does &lt;!DOCTYPE html&gt; do?", options: ["Creates a title","Declares HTML5","Starts the body section","Links a stylesheet"], correct: 1 },
+        { question: "Which of the following is NOT a browser?", options: ["Safari","Opera","Google Chrome","YouTube"], correct: 3 },
+        { question: "Which of the following is used to write HTML code?", options: ["VS Code","PowerPoint","Adobe Photoshop","WhatsApp"], correct: 0 },
+        { question: "An HTML element consists of:", options: ["Only an opening tag","Opening tag, content, closing tag","A CSS file"], correct: 2 },
+        { question: "What is the correct syntax for the anchor tag?", options: ["&lt;a link=\"...\"&gt;","&lt;a href=\"...\"&gt;","&lt;a url=\"...\"&gt;","&lt;a ref=\"...\"&gt;"], correct: 1 }
     ],
     "SS3": [
-        { question: "What is JavaScript primarily used for?", options: ["Styling web pages", "Adding interactivity to web pages", "Creating databases", "Designing graphics"], correct: 1 },
-        { question: "Which symbol is used for single-line comments in JavaScript?", options: ["//", "&lt;!--", "/*", "#"], correct: 0 },
-        { question: "What does DOM stand for?", options: ["Document Object Model", "Data Object Management", "Digital Output Method", "Display Object Model"], correct: 0 },
-        { question: "How do you declare a variable in JavaScript?", options: ["var x;", "variable x;", "v x;", "dim x;"], correct: 0 },
-        { question: "Which keyword is used to declare a constant in JavaScript?", options: ["constant", "const", "var", "let"], correct: 1 },
-        { question: "What is the correct way to write an if statement?", options: ["if x = 5 then", "if (x == 5)", "if x == 5", "if (x = 5)"], correct: 1 },
-        { question: "How do you write a function in JavaScript?", options: ["function myFunction()", "function: myFunction()", "def myFunction()", "func myFunction()"], correct: 0 },
-        { question: "Which operator checks both value and type equality?", options: ["==", "=", "===", "!="], correct: 2 },
-        { question: "How do you select an element by ID in JavaScript?", options: ["document.getElementById()", "document.getElement()", "document.selectId()", "document.select()"], correct: 0 },
-        { question: "What does 'alert()' do?", options: ["Displays a message box", "Sounds an alarm", "Highlights text", "Creates a warning"], correct: 0 },
-        { question: "How do you write a for loop in JavaScript?", options: ["for (i = 0; i &lt; 5; i++)", "for i = 1 to 5", "for (i = 0; i &lt; 5)", "loop (i &lt; 5)"], correct: 0 },
-        { question: "What is an array in JavaScript?", options: ["A single variable", "A collection of variables", "A function", "A loop"], correct: 1 },
-        { question: "How do you add an item to the end of an array?", options: ["array.add()", "array.push()", "array.append()", "array.insert()"], correct: 1 },
-        { question: "What does 'console.log()' do?", options: ["Logs in to console", "Prints output to browser console", "Creates a log file", "Records errors"], correct: 1 },
-        { question: "Which method converts a string to an integer?", options: ["parseInt()", "toInteger()", "convertInt()", "stringToInt()"], correct: 0 },
-        { question: "What is the correct way to write a while loop?", options: ["while (i &lt; 10)", "while i &lt; 10", "while (i &lt; 10) do", "loop while (i &lt; 10)"], correct: 0 },
-        { question: "How do you add an event listener to a button?", options: ["button.addEvent()", "button.addEventListener()", "button.on()", "button.listen()"], correct: 1 },
-        { question: "What does 'this' keyword refer to in JavaScript?", options: ["The previous element", "The current object", "The next element", "The parent element"], correct: 1 },
-        { question: "How do you create an object in JavaScript?", options: ["var obj = {}", "var obj = []", "var obj = ()", "object obj = {}"], correct: 0 },
-        { question: "Which method removes the last element from an array?", options: ["array.remove()", "array.pop()", "array.delete()", "array.removeLast()"], correct: 1 },
-        { question: "What is the purpose of 'return' in a function?", options: ["Returns to previous page", "Exits and returns a value", "Goes back one step", "Restarts function"], correct: 1 },
-        { question: "How do you get the length of a string?", options: ["string.length", "string.size", "string.count", "length(string)"], correct: 0 },
-        { question: "What does 'NaN' stand for?", options: ["Not a Number", "Null and None", "New Array Number", "Negative Array Number"], correct: 0 },
-        { question: "Which method finds an element in an array?", options: ["array.search()", "array.find()", "array.locate()", "array.get()"], correct: 1 },
-        { question: "How do you convert a number to a string?", options: ["toString()", "toText()", "stringify()", "convertString()"], correct: 0 },
-        { question: "What is the difference between 'let' and 'var'?", options: ["No difference", "'let' has block scope, 'var' has function scope", "'let' is newer only", "'var' is faster"], correct: 1 },
-        { question: "How do you check if a variable is undefined?", options: ["if (x === undefined)", "if (undefined(x))", "if (x == null)", "if (empty(x))"], correct: 0 },
-        { question: "What does the 'break' statement do in a loop?", options: ["Pauses the loop", "Exits the loop", "Skips one iteration", "Breaks the code"], correct: 1 },
-        { question: "How do you round a number to the nearest integer?", options: ["Math.round()", "round()", "Math.ceil()", "number.round()"], correct: 0 },
-        { question: "What is JSON used for?", options: ["Creating animations", "Storing and exchanging data", "Styling pages", "Running scripts"], correct: 1 }
+        { question: "Which key is described as 'the largest key' on the keyboard?", options: ["Enter key","Backspace key","Space bar key","Function key"],correct: 2 },
+        { question: "What is the main purpose of refreshing your computer screen?", options: ["To turn off the computer","To create new folders","To see the most current version of content","To edit cell content in Excel"], correct: 2 },
+        { question: "Which function key is typically used to open search within a program?", options: ["F1","F2", "F3","F4"], correct: 2 },
+        { question: "Where is the power button typically located on a desktop computer?", options: [ "Only on the front of the computer case","Only on the keyboard","On the front of the computer case or sometimes on the side/back of monitor","Exclusively on the monitor"],correct: 2 },
+        { question: "What is the first step in creating a new folder?", options: ["Right-click on an empty area","Press the Enter key","Go to the desired location","Type a name for the folder"], correct: 2 },
+        { question: "After right-clicking to create a new folder, what should you do next?", options: ["Press the Space bar","Hover over 'New' and select 'Folder'","Use the Backspace key","Press F1 for help"], correct: 1 },
+        { question: "What is the common shortcut for Undo in most programs?", options: ["Ctrl+Z","Ctrl+C","Ctrl+V","Ctrl+X"], correct: 0 },
+        { question: "What is the common shortcut for copy in most programs?", options: ["Ctrl+Z","Ctrl+C","Ctrl+V","Ctrl+X"], correct: 1 },
+        { question: "What is the function of the Caps Lock key?", options: ["Types all capital letters","Deletes text","Saves the document","Opens menus"], correct: 0 },
+        { question: "What is the primary function of the Enter key?", options: ["To delete text", "To give spaces between words", "To start execution or submit a command", "To open search functions"], correct: 2 },
+        { question: "What does HTML stand for?", options: ["Hyperlinks and Text Marking Language","HyperText Markup Language","HighText Machine Language","Home Tool Markup Language"], correct: 1 },
+        { question: "Which of the following is used to view web pages?", options: ["Compiler","Browser","Terminal","Editor"],correct: 1 },
+        { question: "A webpage is best described as:", options: ["A collection of websites","A single document on the web","A computer program","An image on the internet"], correct: 1 },
+        { question: "Which of these is a search engine?", options: ["Chrome","Firefox","Google","VS Code"], correct: 2 },
+        { question: "Which of the following is an HTML button?", options: ["&lt;button&gt;Click me&lt;/button&gt;","&lt;click&gt;Click me&lt;/click&gt;","&lt;input type=\"pbutton\"&gt;","&lt;press&gt;Click&lt;/press&gt;"], correct: 0 },
+        { question: "HTML is used for:", options: ["Styling webpages","Adding logic","Structuring webpages","Creating databases"], correct: 2 },
+        { question: "Which part of this element is the attribute? &lt;a href=\"index.html\"&gt;Home&lt;/a&gt;", options: ["a","href","Home","index.html"], correct: 1 },
+        { question: "The root element of every HTML file is:", options: ["&lt;body&gt;","&lt;head&gt;","&lt;title&gt;","&lt;html&gt;"], correct: 3 },
+        { question: "Which tag is used to display a large heading?", options: ["&lt;h6&gt;","&lt;h5&gt;","&lt;h1&gt;","&lt;heading&gt;"], correct: 2 },
+        { question: "The tag used to create a paragraph is:", options: ["&lt;para&gt;","&lt;p&gt;","&lt;pg&gt;","&lt;paragraph&gt;"], correct: 1 },
+        { question: "Which tag creates a clickable link?", options: ["&lt;a&gt;","&lt;link&gt;","&lt;href&gt;","&lt;url&gt;"], correct: 0 },
+        { question: "What attribute is used to specify the link of an anchor tag?", options: ["src","link","href","ref"], correct: 2 },
+        { question: "Which tag is used to create a button in HTML?", options: ["&lt;btn&gt;","&lt;button&gt;","&lt;click&gt;","&lt;press&gt;"], correct: 1 },
+        { question: "Which part of the HTML file contains information about the page?", options: ["&lt;body&gt;","&lt;html&gt;","&lt;head&gt;","&lt;info&gt;"], correct: 2 },
+        { question: "Which tag displays content that users see on the webpage?", options: ["&lt;html&gt;","&lt;meta&gt;","&lt;head&gt;","&lt;body&gt;"], correct: 3 },
+        { question: "What does &lt;!DOCTYPE html&gt; do?", options: ["Creates a title","Declares HTML5","Starts the body section","Links a stylesheet"], correct: 1 },
+        { question: "Which of the following is NOT a browser?", options: ["Safari","Opera","Google Chrome","YouTube"], correct: 3 },
+        { question: "Which of the following is used to write HTML code?", options: ["VS Code","PowerPoint","Adobe Photoshop","WhatsApp"], correct: 0 },
+        { question: "An HTML element consists of:", options: ["Only an opening tag","Opening tag, content, closing tag","A CSS file"], correct: 2 },
+        { question: "What is the correct syntax for the anchor tag?", options: ["&lt;a link=\"...\"&gt;","&lt;a href=\"...\"&gt;","&lt;a url=\"...\"&gt;","&lt;a ref=\"...\"&gt;"], correct: 1 }
     ]
 };
 
-// ==================== APPLICATION STATE ====================
+
 
 let currentState = {
     studentId: null,
@@ -523,7 +518,6 @@ const FORM_FIELD_IDS = {
 
 let students = [];
 
-// ==================== CORE FUNCTIONS ====================
 
 async function initializeApp() {
     document.getElementById('student-login').style.display = 'block';
@@ -860,12 +854,12 @@ async function submitExam() {
     const currentPercentage = (currentTotalMarks / 100) * 100;
     
     let grade = '';
-    if (currentPercentage >= 90) grade = 'A+ (Excellent)';
-    else if (currentPercentage >= 80) grade = 'A (Very Good)';
-    else if (currentPercentage >= 70) grade = 'B (Good)';
-    else if (currentPercentage >= 60) grade = 'C (Fair)';
-    else if (currentPercentage >= 50) grade = 'D (Pass)';
-    else grade = 'F (Fail)';
+    if (currentPercentage >= 85) grade = 'A+ (Excellent)';
+    else if (currentPercentage >= 75) grade = 'A (Very Good)';
+    else if (currentPercentage >= 65) grade = 'B (Good)';
+    else if (currentPercentage >= 55) grade = 'C (Credit)';
+    else if (currentPercentage >= 40) grade = 'D (Pass)';
+    else grade = 'F (Fair)';
     
     const result = {
         studentId: currentState.studentId,
@@ -1018,7 +1012,6 @@ function backToMainLogin() {
     document.getElementById('student-name').value = '';
 }
 
-// ==================== ADMIN FUNCTIONS ====================
 
 function showAdminLogin() {
     document.getElementById('student-login').style.display = 'none';
@@ -1033,19 +1026,19 @@ function adminLoginAction() {
         document.getElementById('admin-login').style.display = 'none';
         document.getElementById('admin-dashboard').style.display = 'block';
         
-        // Load data
+        
         loadAdminResults();
         loadSignatures();
         loadStudents();
         
-        // Initialize admin tabs
+        
         setTimeout(() => {
             initializeAdminTabs();
             initializeSettingsPanel();
             initializeQuestionsPanel();
         }, 100);
         
-        // Add sync button
+        
         addSyncButtonToAdmin();
         
         showRealTimeNotification(`🔧 Admin dashboard loaded - ${realTimeEnabled ? 'Real-time sync active' : 'Offline mode'}`);
@@ -1316,12 +1309,12 @@ function updatePracticalScoreLocal(studentId, timestamp, practicalScore) {
         const percentage = (totalMarks / 100) * 100;
         
         let grade = '';
-        if (percentage >= 90) grade = 'A+ (Excellent)';
-        else if (percentage >= 80) grade = 'A (Very Good)';
-        else if (percentage >= 70) grade = 'B (Good)';
-        else if (percentage >= 60) grade = 'C (Fair)';
-        else if (percentage >= 50) grade = 'D (Pass)';
-        else grade = 'F (Fail)';
+        if (percentage >= 85) grade = 'A+ (Excellent)';
+        else if (percentage >= 75) grade = 'A (Very Good)';
+        else if (percentage >= 65) grade = 'B (Good)';
+        else if (percentage >= 55) grade = 'C (Credit)';
+        else if (percentage >= 40) grade = 'D (Pass)';
+        else grade = 'F (Fair)';
         
         results[resultIndex].totalMarks = totalMarks;
         results[resultIndex].percentage = percentage.toFixed(1);
@@ -1533,14 +1526,14 @@ function printIndividualResult(event) {
                             `<img src="${currentSignatures.coordinator}" alt="CEO TECHXAGON ACADEMY Signature" class="signature-image">` : 
                             '<div class="signature-placeholder"></div>'
                         }
-                        <div class="signature-name">CEO TECHXAGON ACADEMY</div>
+                        <div class="signature-name"><small>CEO TECHXAGON ACADEMY</small></div>
                     </div>
                     <div class="signature-line">
                         ${currentSignatures.principal ? 
                             `<img src="${currentSignatures.principal}" alt="School Principal Signature" class="signature-image">` : 
                             '<div class="signature-placeholder"></div>'
                         }
-                        <div class="signature-name">VP ACADEMICS SNR(DD)</div>
+                        <div class="signature-name"><small>VP ACADEMICS SNR(DD)</small></div>
                     </div>
                 </div>
             </div>
@@ -1605,7 +1598,7 @@ function exportToExcel() {
     document.body.removeChild(a);
 }
 
-// ==================== STUDENT MANAGEMENT ====================
+
 
 function loadStudents() {
     const studentsList = document.getElementById('students-list');
@@ -1728,7 +1721,6 @@ function exportStudentsToExcel() {
     document.body.removeChild(a);
 }
 
-// ==================== SIGNATURE MANAGEMENT ====================
 
 async function loadSignatures() {
     const saved = await loadSignaturesFromFirebase();
@@ -1821,7 +1813,6 @@ function updateStudentResultSignatures() {
     }
 }
 
-// ==================== ADMIN PANEL TAB SYSTEM ====================
 
 function initializeAdminTabs() {
     console.log('Initializing admin tabs...');
@@ -1979,7 +1970,6 @@ function initializeQuestionManagement() {
     }
 }
 
-// ==================== QUESTION MANAGEMENT FUNCTIONS ====================
 
 function showBulkUploadSection() {
     const bulkSection = document.getElementById('bulk-upload-section');
@@ -2133,7 +2123,7 @@ async function addSingleQuestion() {
     }
 }
 
-// ==================== DATA MANAGEMENT FUNCTIONS ====================
+
 
 async function clearAllStudents() {
     if (!confirm('⚠️ WARNING: This will permanently delete ALL student records. This action cannot be undone!\n\nAre you sure you want to continue?')) {
@@ -2373,7 +2363,6 @@ async function deleteAutoRegisteredStudent(studentId) {
     showRealTimeNotification(`🗑️ Auto-registered student ${studentId} deleted`);
 }
 
-// ==================== FIREBASE TEST FUNCTION ====================
 
 async function testFirebaseConnection() {
     if (!realTimeEnabled) {
@@ -2409,7 +2398,6 @@ async function testFirebaseConnection() {
     }
 }
 
-// ==================== NOTIFICATION SYSTEM ====================
 
 function showRealTimeNotification(message) {
     let notificationContainer = document.getElementById('real-time-notification-container');
@@ -2476,7 +2464,6 @@ function showRealTimeNotification(message) {
     });
 }
 
-// ==================== EVENT LISTENERS ====================
 
 document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
@@ -2499,7 +2486,7 @@ document.addEventListener('DOMContentLoaded', function() {
     updateConnectionStatus();
 });
 
-// Add CSS for notifications
+
 const notificationStyles = `
 @keyframes slideInRight {
     from {
@@ -2532,7 +2519,7 @@ const styleSheet = document.createElement('style');
 styleSheet.textContent = notificationStyles;
 document.head.appendChild(styleSheet);
 
-// Basic event listeners
+
 document.getElementById('student-login-btn')?.addEventListener('click', studentLoginAction);
 document.getElementById('admin-login-btn')?.addEventListener('click', showAdminLogin);
 document.getElementById('login-btn')?.addEventListener('click', adminLoginAction);
@@ -2551,7 +2538,7 @@ document.getElementById('add-student-btn')?.addEventListener('click', addStudent
 document.getElementById('export-results')?.addEventListener('click', exportToExcel);
 document.getElementById('export-students')?.addEventListener('click', exportStudentsToExcel);
 
-// Class selection buttons
+
 document.querySelectorAll('.class-select').forEach(button => {
     button.addEventListener('click', async function() {
         const level = this.getAttribute('data-level');
@@ -2573,14 +2560,14 @@ document.querySelectorAll('.class-select').forEach(button => {
     });
 });
 
-// Admin filters
+
 document.getElementById('class-select-admin')?.addEventListener('change', loadAdminResults);
 document.getElementById('arm-select-admin')?.addEventListener('change', loadAdminResults);
 document.getElementById('filter-class')?.addEventListener('change', loadStudents);
 document.getElementById('filter-arm')?.addEventListener('change', loadStudents);
 document.getElementById('search-student')?.addEventListener('input', loadStudents);
 
-// Signature uploads
+
 document.getElementById('coordinator-signature-upload')?.addEventListener('change', function(e) {
     handleSignatureUpload(e, 'coordinator');
 });
@@ -2595,4 +2582,3 @@ document.getElementById('remove-principal-signature')?.addEventListener('click',
 });
 
 console.log('CBT System JavaScript loaded successfully!');
-
